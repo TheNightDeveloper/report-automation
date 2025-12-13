@@ -2,16 +2,41 @@ import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:path/path.dart' as path;
+import 'package:flutter/services.dart' show rootBundle;
 import '../models/models.dart';
 
 class ExportService {
+  pw.Font? _persianFont;
+
+  /// بارگذاری فونت فارسی
+  Future<pw.Font> _loadPersianFont() async {
+    if (_persianFont != null) return _persianFont!;
+
+    try {
+      // استفاده از فونت Vazir که با زبان فارسی سازگار است
+      final fontData = await rootBundle.load(
+        'assets/fonts/Vazirmatn-Regular.ttf',
+      );
+      _persianFont = pw.Font.ttf(fontData);
+      return _persianFont!;
+    } catch (e) {
+      // اگر فونت پیدا نشد، از فونت پیش‌فرض استفاده می‌کنیم
+      // اما این فونت فارسی را به درستی نمایش نمی‌دهد
+      throw Exception(
+        'فونت فارسی یافت نشد. لطفاً فونت را در assets/fonts قرار دهید.',
+      );
+    }
+  }
+
   /// خروجی PDF برای یک کارنامه
   Future<String> exportToPDF({
     required ReportCard reportCard,
     required String outputDirectory,
   }) async {
     try {
+      // بارگذاری فونت فارسی
+      final persianFont = await _loadPersianFont();
+
       // بررسی وجود پوشه خروجی
       final dir = Directory(outputDirectory);
       if (!await dir.exists()) {
@@ -20,7 +45,7 @@ class ExportService {
 
       // ایجاد نام فایل
       final fileName = _sanitizeFileName(reportCard.studentInfo.name);
-      final filePath = path.join(outputDirectory, '$fileName.pdf');
+      final filePath = '$outputDirectory${Platform.pathSeparator}$fileName.pdf';
 
       // ایجاد سند PDF
       final pdf = pw.Document();
@@ -30,6 +55,7 @@ class ExportService {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           textDirection: pw.TextDirection.rtl,
+          theme: pw.ThemeData.withFont(base: persianFont, bold: persianFont),
           build: (context) => [
             _buildPDFHeader(reportCard),
             pw.SizedBox(height: 20),
@@ -66,7 +92,8 @@ class ExportService {
 
       // ایجاد نام فایل
       final fileName = _sanitizeFileName(reportCard.studentInfo.name);
-      final filePath = path.join(outputDirectory, '$fileName.xlsx');
+      final filePath =
+          '$outputDirectory${Platform.pathSeparator}$fileName.xlsx';
 
       // ایجاد فایل Excel
       final excel = Excel.createExcel();
@@ -232,7 +259,7 @@ class ExportService {
                 ),
               ),
               pw.SizedBox(height: 8),
-              pw.Table.fromTextArray(
+              pw.TableHelper.fromTextArray(
                 headers: ['ردیف', 'تکنیک', 'سطح عملکرد'],
                 data: section.techniques.map((tech) {
                   return [
@@ -244,6 +271,10 @@ class ExportService {
                 headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 cellAlignment: pw.Alignment.centerRight,
                 headerAlignment: pw.Alignment.center,
+                border: pw.TableBorder.all(color: PdfColors.grey),
+                headerDecoration: const pw.BoxDecoration(
+                  color: PdfColors.grey300,
+                ),
               ),
             ],
           ),

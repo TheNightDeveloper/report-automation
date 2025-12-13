@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../viewmodels/report_card_viewmodel.dart';
 import '../viewmodels/student_viewmodel.dart';
+import '../viewmodels/app_data_viewmodel.dart';
 import '../models/models.dart';
 import '../utils/report_card_template.dart';
 
@@ -292,7 +293,10 @@ class ReportCardScreen extends ConsumerWidget {
     WidgetRef ref,
     ReportCard reportCard,
   ) {
+    final appData = ref.watch(appDataProvider);
+
     return Card(
+      key: ValueKey(reportCard.studentInfo.name),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -306,6 +310,7 @@ class ReportCardScreen extends ConsumerWidget {
 
             // نام دانش‌آموز (read-only)
             TextFormField(
+              key: ValueKey('name_${reportCard.studentInfo.name}'),
               initialValue: reportCard.studentInfo.name,
               decoration: const InputDecoration(
                 labelText: 'نام دانش‌آموز',
@@ -316,65 +321,111 @@ class ReportCardScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // مقطع
-            TextFormField(
-              initialValue: reportCard.studentInfo.grade,
+            DropdownButtonFormField<String>(
+              key: ValueKey(
+                'grade_${reportCard.studentInfo.name}_${reportCard.studentInfo.grade}',
+              ),
+              value: reportCard.studentInfo.grade?.isNotEmpty == true
+                  ? reportCard.studentInfo.grade
+                  : null,
               decoration: const InputDecoration(
                 labelText: 'مقطع',
-                hintText: 'مثال: ابتدایی',
+                hintText: 'انتخاب مقطع',
                 prefixIcon: Icon(Icons.school),
               ),
+              items: appData.grades
+                  .map(
+                    (grade) =>
+                        DropdownMenuItem(value: grade, child: Text(grade)),
+                  )
+                  .toList(),
               onChanged: (value) {
                 ref
                     .read(reportCardProvider.notifier)
-                    .updateStudentInfo(grade: value.isEmpty ? null : value);
+                    .updateStudentInfo(grade: value);
               },
             ),
             const SizedBox(height: 16),
 
             // پایه
-            TextFormField(
-              initialValue: reportCard.studentInfo.level,
+            DropdownButtonFormField<String>(
+              key: ValueKey(
+                'level_${reportCard.studentInfo.name}_${reportCard.studentInfo.level}',
+              ),
+              value: reportCard.studentInfo.level?.isNotEmpty == true
+                  ? reportCard.studentInfo.level
+                  : null,
               decoration: const InputDecoration(
                 labelText: 'پایه',
-                hintText: 'مثال: سال اول',
+                hintText: 'انتخاب پایه',
                 prefixIcon: Icon(Icons.grade),
               ),
+              items: appData.levels
+                  .map(
+                    (level) =>
+                        DropdownMenuItem(value: level, child: Text(level)),
+                  )
+                  .toList(),
               onChanged: (value) {
                 ref
                     .read(reportCardProvider.notifier)
-                    .updateStudentInfo(level: value.isEmpty ? null : value);
+                    .updateStudentInfo(level: value);
               },
             ),
             const SizedBox(height: 16),
 
             // آموزشگاه
-            TextFormField(
-              initialValue: reportCard.studentInfo.school,
+            DropdownButtonFormField<String>(
+              key: ValueKey(
+                'school_${reportCard.studentInfo.name}_${reportCard.studentInfo.school}',
+              ),
+              value: reportCard.studentInfo.school?.isNotEmpty == true
+                  ? reportCard.studentInfo.school
+                  : null,
               decoration: const InputDecoration(
                 labelText: 'آموزشگاه',
-                hintText: 'نام آموزشگاه',
+                hintText: 'انتخاب آموزشگاه',
                 prefixIcon: Icon(Icons.business),
               ),
+              items: appData.schools
+                  .map(
+                    (school) =>
+                        DropdownMenuItem(value: school, child: Text(school)),
+                  )
+                  .toList(),
               onChanged: (value) {
                 ref
                     .read(reportCardProvider.notifier)
-                    .updateStudentInfo(school: value.isEmpty ? null : value);
+                    .updateStudentInfo(school: value);
               },
             ),
             const SizedBox(height: 16),
 
             // سرمربی
-            TextFormField(
-              initialValue: reportCard.studentInfo.headCoach,
+            DropdownButtonFormField<String>(
+              key: ValueKey(
+                'headCoach_${reportCard.studentInfo.name}_${reportCard.studentInfo.headCoach}',
+              ),
+              value: reportCard.studentInfo.headCoach?.isNotEmpty == true
+                  ? reportCard.studentInfo.headCoach
+                  : null,
               decoration: const InputDecoration(
                 labelText: 'سرمربی',
-                hintText: 'نام سرمربی',
+                hintText: 'انتخاب سرمربی',
                 prefixIcon: Icon(Icons.sports),
               ),
+              items: appData.headCoaches
+                  .map(
+                    (headCoach) => DropdownMenuItem(
+                      value: headCoach,
+                      child: Text(headCoach),
+                    ),
+                  )
+                  .toList(),
               onChanged: (value) {
                 ref
                     .read(reportCardProvider.notifier)
-                    .updateStudentInfo(headCoach: value.isEmpty ? null : value);
+                    .updateStudentInfo(headCoach: value);
               },
             ),
           ],
@@ -389,6 +440,7 @@ class ReportCardScreen extends ConsumerWidget {
     ReportCard reportCard,
   ) {
     return Card(
+      key: ValueKey('attendance_${reportCard.studentInfo.name}'),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -405,6 +457,9 @@ class ReportCardScreen extends ConsumerWidget {
                 // تعداد جلسات
                 Expanded(
                   child: TextFormField(
+                    key: ValueKey(
+                      'totalSessions_${reportCard.studentInfo.name}_${reportCard.attendanceInfo.totalSessions}',
+                    ),
                     initialValue: reportCard.attendanceInfo.totalSessions
                         .toString(),
                     decoration: const InputDecoration(
@@ -427,6 +482,9 @@ class ReportCardScreen extends ConsumerWidget {
                 // جلسات حاضر
                 Expanded(
                   child: TextFormField(
+                    key: ValueKey(
+                      'attendedSessions_${reportCard.studentInfo.name}_${reportCard.attendanceInfo.attendedSessions}',
+                    ),
                     initialValue: reportCard.attendanceInfo.attendedSessions
                         .toString(),
                     decoration: const InputDecoration(
@@ -449,6 +507,9 @@ class ReportCardScreen extends ConsumerWidget {
                 // ردیف عملکرد
                 Expanded(
                   child: TextFormField(
+                    key: ValueKey(
+                      'performanceRank_${reportCard.studentInfo.name}_${reportCard.attendanceInfo.performanceRank}',
+                    ),
                     initialValue: reportCard.attendanceInfo.performanceRank
                         .toString(),
                     decoration: const InputDecoration(
