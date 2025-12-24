@@ -1,14 +1,36 @@
 import '../models/models.dart';
 
 class ReportCardTemplate {
-  static const String preschoolSection = 'مخصوص دانش‌آموزان پیش دبستانی';
-  static const String year1Section = 'سال تحصیلی اول';
-  static const String year2Section = 'سال تحصیلی دوم';
-  static const String year3Section = 'سال تحصیلی سوم';
-  static const String year4Section = 'سال تحصیلی چهارم';
+  static const String level1Section = 'سطح 1';
+  static const String level2Section = 'سطح 2';
+  static const String level3Section = 'سطح 3';
+  static const String level4Section = 'سطح 4';
+  static const String level5Section = 'سطح 5';
+  static const String level6Section = 'سطح 6';
+  static const String level7Section = 'سطح 7';
 
-  // بخش پیش دبستانی - 9 تکنیک
-  static List<TechniqueEvaluation> getPreschoolTechniques() {
+  // عناوین هر سطح
+  static const Map<String, String> sectionTitles = {
+    level1Section: 'آشنایی با آب و شناوری‌ها',
+    level2Section: 'آموزش مقدماتی کرال سینه و پشت و پا دوچرخه',
+    level3Section: 'آموزش تکمیلی کرال سینه و پشت و مقدماتی قورباغه',
+    level4Section:
+        'اصلاح تکنیک کرال سینه و پشت و تکمیلی قورباغه و مقدماتی پروانه',
+    level5Section:
+        'اصلاح تکنیک قورباغه و تکمیلی پروانه و آمادگی جهت شرکت در مسابقات کرال سینه و کرال پشت',
+    level6Section:
+        'اصلاح تکنیک پروانه و رکورد کرال سینه جهت آماده‌سازی نجات غریق و شرکت در مسابقات سه شنا اصلی (سینه - پشت - قورباغه)',
+    level7Section:
+        'رکورد 200 متر سینه و قورباغه 25 درصد کمتر از حداکثر رکورد نجات غریق و آماده‌سازی جهت شرکت در مسابقات چهار شنا اصلی',
+  };
+
+  // دریافت عنوان یک سطح
+  static String getSectionTitle(String sectionName) {
+    return sectionTitles[sectionName] ?? '';
+  }
+
+  // سطح 1 - آشنایی با آب و شناوری‌ها
+  static List<TechniqueEvaluation> getLevel1Techniques() {
     return [
       TechniqueEvaluation(number: 1, techniqueName: 'دویدن در آب'),
       TechniqueEvaluation(number: 2, techniqueName: 'تخلیه هوا'),
@@ -22,8 +44,8 @@ class ReportCardTemplate {
     ];
   }
 
-  // سال اول - 9 تکنیک
-  static List<TechniqueEvaluation> getYear1Techniques() {
+  // سطح 2 - آموزش مقدماتی کرال سینه و پشت و پا دوچرخه
+  static List<TechniqueEvaluation> getLevel2Techniques() {
     return [
       TechniqueEvaluation(number: 1, techniqueName: 'پای کرال سینه'),
       TechniqueEvaluation(number: 2, techniqueName: 'پای کرال پشت'),
@@ -37,8 +59,8 @@ class ReportCardTemplate {
     ];
   }
 
-  // سال دوم - 9 تکنیک
-  static List<TechniqueEvaluation> getYear2Techniques() {
+  // سطح 3 - آموزش تکمیلی کرال سینه و پشت و مقدماتی قورباغه
+  static List<TechniqueEvaluation> getLevel3Techniques() {
     return [
       TechniqueEvaluation(number: 1, techniqueName: 'دست کرال سینه'),
       TechniqueEvaluation(number: 2, techniqueName: 'دست کرال پشت'),
@@ -58,8 +80,8 @@ class ReportCardTemplate {
     ];
   }
 
-  // سال سوم - 9 تکنیک
-  static List<TechniqueEvaluation> getYear3Techniques() {
+  // سطح 4 - اصلاح تکنیک کرال سینه و پشت و تکمیلی قورباغه و مقدماتی پروانه
+  static List<TechniqueEvaluation> getLevel4Techniques() {
     return [
       TechniqueEvaluation(
         number: 1,
@@ -79,8 +101,8 @@ class ReportCardTemplate {
     ];
   }
 
-  // سال چهارم - 9 تکنیک
-  static List<TechniqueEvaluation> getYear4Techniques() {
+  // سطح 5 - اصلاح تکنیک قورباغه و تکمیلی پروانه
+  static List<TechniqueEvaluation> getLevel5Techniques() {
     return [
       TechniqueEvaluation(
         number: 1,
@@ -100,28 +122,81 @@ class ReportCardTemplate {
     ];
   }
 
+  // سطح 6 - اصلاح تکنیک پروانه و رکورد کرال سینه
+  static List<TechniqueEvaluation> getLevel6Techniques() {
+    return [
+      TechniqueEvaluation(number: 1, techniqueName: 'تمرینات انتروال سینه'),
+      TechniqueEvaluation(number: 2, techniqueName: 'رکورد 200 متر کرال سینه'),
+      TechniqueEvaluation(
+        number: 3,
+        techniqueName: 'کرال سر بالا و قورباغه سر بالا 50 متر',
+      ),
+      TechniqueEvaluation(number: 4, techniqueName: '4*25 مختلط انفرادی'),
+      TechniqueEvaluation(number: 5, techniqueName: 'زیر آبی 20 متر'),
+      TechniqueEvaluation(
+        number: 6,
+        techniqueName: 'تمرینات استقامت سینه و قورباغه 400 متر',
+      ),
+      TechniqueEvaluation(number: 7, techniqueName: 'رکورد 100 متر قورباغه'),
+      TechniqueEvaluation(number: 8, techniqueName: 'انواع قوس‌ها'),
+      TechniqueEvaluation(number: 9, techniqueName: 'سالتو سینه و پشت'),
+    ];
+  }
+
+  // سطح 7 - رکورد 200 متر سینه و قورباغه
+  static List<TechniqueEvaluation> getLevel7Techniques() {
+    return [
+      TechniqueEvaluation(number: 1, techniqueName: '4*50 مختلط انفرادی'),
+      TechniqueEvaluation(number: 2, techniqueName: 'تمرینات استقامت 800 متر'),
+      TechniqueEvaluation(number: 3, techniqueName: 'شنا با مانع 100 متر'),
+      TechniqueEvaluation(number: 4, techniqueName: 'شنا پهلو (قیچی) 100 متر'),
+      TechniqueEvaluation(number: 5, techniqueName: 'پشت مقدماتی 100 متر'),
+      TechniqueEvaluation(
+        number: 6,
+        techniqueName: 'تمرینات اینتروال پروانه و قورباغه',
+      ),
+      TechniqueEvaluation(number: 7, techniqueName: 'رکورد 400 متر سینه'),
+      TechniqueEvaluation(
+        number: 8,
+        techniqueName: '2 دقیقه دوچرخه با دست بالا',
+      ),
+      TechniqueEvaluation(
+        number: 9,
+        techniqueName: 'تمرینات 10*25 قورباغه و پروانه',
+      ),
+    ];
+  }
+
   // ایجاد تمام بخش‌ها
   static Map<String, SectionEvaluation> createAllSections() {
     return {
-      preschoolSection: SectionEvaluation(
-        sectionName: preschoolSection,
-        techniques: getPreschoolTechniques(),
+      level1Section: SectionEvaluation(
+        sectionName: level1Section,
+        techniques: getLevel1Techniques(),
       ),
-      year1Section: SectionEvaluation(
-        sectionName: year1Section,
-        techniques: getYear1Techniques(),
+      level2Section: SectionEvaluation(
+        sectionName: level2Section,
+        techniques: getLevel2Techniques(),
       ),
-      year2Section: SectionEvaluation(
-        sectionName: year2Section,
-        techniques: getYear2Techniques(),
+      level3Section: SectionEvaluation(
+        sectionName: level3Section,
+        techniques: getLevel3Techniques(),
       ),
-      year3Section: SectionEvaluation(
-        sectionName: year3Section,
-        techniques: getYear3Techniques(),
+      level4Section: SectionEvaluation(
+        sectionName: level4Section,
+        techniques: getLevel4Techniques(),
       ),
-      year4Section: SectionEvaluation(
-        sectionName: year4Section,
-        techniques: getYear4Techniques(),
+      level5Section: SectionEvaluation(
+        sectionName: level5Section,
+        techniques: getLevel5Techniques(),
+      ),
+      level6Section: SectionEvaluation(
+        sectionName: level6Section,
+        techniques: getLevel6Techniques(),
+      ),
+      level7Section: SectionEvaluation(
+        sectionName: level7Section,
+        techniques: getLevel7Techniques(),
       ),
     };
   }
@@ -129,16 +204,18 @@ class ReportCardTemplate {
   // لیست نام بخش‌ها به ترتیب
   static List<String> getSectionNames() {
     return [
-      preschoolSection,
-      year1Section,
-      year2Section,
-      year3Section,
-      year4Section,
+      level1Section,
+      level2Section,
+      level3Section,
+      level4Section,
+      level5Section,
+      level6Section,
+      level7Section,
     ];
   }
 
   // تعداد کل تکنیک‌ها
   static int getTotalTechniquesCount() {
-    return 45; // 9 تکنیک × 5 بخش
+    return 63; // 9 تکنیک × 7 سطح
   }
 }

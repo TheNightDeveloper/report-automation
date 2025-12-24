@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../viewmodels/export_viewmodel.dart';
 import '../viewmodels/student_viewmodel.dart';
 import '../viewmodels/report_card_viewmodel.dart';
@@ -16,6 +18,35 @@ class ExportScreen extends ConsumerStatefulWidget {
 class _ExportScreenState extends ConsumerState<ExportScreen> {
   ExportFormat _selectedFormat = ExportFormat.pdf;
   bool _exportAll = true;
+  final TextEditingController _pathController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDefaultPath();
+  }
+
+  @override
+  void dispose() {
+    _pathController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadDefaultPath() async {
+    // مسیر پیش‌فرض: Documents/کارنامه
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final defaultPath = '${docsDir.path}${Platform.pathSeparator}کارنامه';
+      final dir = Directory(defaultPath);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      _pathController.text = defaultPath;
+      setState(() {});
+    } catch (e) {
+      // در صورت خطا، کاربر باید مسیر را انتخاب کند
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,36 +55,11 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('خروجی فایل')),
-      body: _buildBody(exportState, studentState),
-    );
-  }
-
-  Widget _buildBody(ExportState exportState, StudentState studentState) {
-    if (studentState.students.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    if (exportState.isExporting) {
-      return _buildExportingState(exportState);
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildFormatSelection(),
-          const SizedBox(height: 24),
-          _buildExportTypeSelection(studentState),
-          const SizedBox(height: 24),
-          _buildExportButton(studentState),
-          const SizedBox(height: 24),
-          if (exportState.successMessage != null)
-            _buildSuccessMessage(exportState.successMessage!),
-          if (exportState.errorMessage != null)
-            _buildErrorMessage(exportState.errorMessage!),
-        ],
-      ),
+      body: studentState.students.isEmpty
+          ? _buildEmptyState()
+          : exportState.isExporting
+          ? _buildExportingState(exportState)
+          : _buildMainContent(exportState, studentState),
     );
   }
 
@@ -63,14 +69,14 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.file_download_outlined,
+            Icons.file_download_off,
             size: 80,
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+            color: Theme.of(context).colorScheme.outline,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Text(
             'هیچ کارنامه‌ای برای خروجی وجود ندارد',
-            style: Theme.of(context).textTheme.headlineMedium,
+            style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
           Text(
@@ -85,7 +91,7 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
   Widget _buildExportingState(ExportState exportState) {
     return Center(
       child: Card(
-        margin: const EdgeInsets.all(24),
+        margin: const EdgeInsets.all(32),
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
@@ -95,15 +101,15 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
               const SizedBox(height: 24),
               Text(
                 'در حال ایجاد فایل‌ها...',
-                style: Theme.of(context).textTheme.titleLarge,
+                style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 16),
-              LinearProgressIndicator(value: exportState.progress),
-              const SizedBox(height: 8),
-              Text(
-                '${exportState.currentItem} از ${exportState.totalItems}',
-                style: Theme.of(context).textTheme.bodyMedium,
+              SizedBox(
+                width: 200,
+                child: LinearProgressIndicator(value: exportState.progress),
               ),
+              const SizedBox(height: 8),
+              Text('${exportState.currentItem} از ${exportState.totalItems}'),
             ],
           ),
         ),
@@ -111,38 +117,129 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     );
   }
 
-  Widget _buildFormatSelection() {
+  Widget _buildMainContent(ExportState exportState, StudentState studentState) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // پیام‌های وضعیت
+          if (exportState.successMessage != null) ...[
+            _buildMessage(exportState.successMessage!, isError: false),
+            const SizedBox(height: 16),
+          ],
+          if (exportState.errorMessage != null) ...[
+            _buildMessage(exportState.errorMessage!, isError: true),
+            const SizedBox(height: 16),
+          ],
+
+          // مسیر خروجی
+          _buildPathSection(),
+          const SizedBox(height: 16),
+
+          // فرمت و نوع خروجی
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildFormatSection()),
+              const SizedBox(width: 16),
+              Expanded(child: _buildTypeSection(studentState)),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // دکمه خروجی
+          _buildExportButton(studentState),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPathSection() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'انتخاب فرمت خروجی',
-              style: Theme.of(context).textTheme.titleLarge,
+            Row(
+              children: [
+                const Icon(Icons.folder_open, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  'مسیر ذخیره فایل‌ها',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: _buildFormatOption(
-                    format: ExportFormat.pdf,
-                    icon: Icons.picture_as_pdf,
-                    label: 'PDF',
-                    description: 'فایل قابل چاپ',
+                  child: TextField(
+                    controller: _pathController,
+                    decoration: InputDecoration(
+                      hintText: 'مسیر را انتخاب کنید...',
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                      suffixIcon: _pathController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                _pathController.clear();
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                    ),
+                    readOnly: true,
+                    onTap: _selectPath,
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildFormatOption(
-                    format: ExportFormat.excel,
-                    icon: Icons.table_chart,
-                    label: 'Excel',
-                    description: 'فایل قابل ویرایش',
-                  ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: _selectPath,
+                  icon: const Icon(Icons.folder),
+                  label: const Text('انتخاب'),
                 ),
               ],
+            ),
+            if (_pathController.text.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'فایل‌ها در این مسیر ذخیره می‌شوند',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.green),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormatSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('فرمت خروجی', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            _buildFormatTile(
+              ExportFormat.pdf,
+              Icons.picture_as_pdf,
+              'PDF',
+              'قابل چاپ',
+            ),
+            const SizedBox(height: 8),
+            _buildFormatTile(
+              ExportFormat.excel,
+              Icons.table_chart,
+              'Excel',
+              'قابل ویرایش',
             ),
           ],
         ),
@@ -150,23 +247,18 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     );
   }
 
-  Widget _buildFormatOption({
-    required ExportFormat format,
-    required IconData icon,
-    required String label,
-    required String description,
-  }) {
+  Widget _buildFormatTile(
+    ExportFormat format,
+    IconData icon,
+    String title,
+    String subtitle,
+  ) {
     final isSelected = _selectedFormat == format;
-
     return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedFormat = format;
-        });
-      },
-      borderRadius: BorderRadius.circular(12),
+      onTap: () => setState(() => _selectedFormat = format),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected
               ? Theme.of(context).colorScheme.primaryContainer
@@ -175,122 +267,187 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
             color: isSelected
                 ? Theme.of(context).colorScheme.primary
                 : Theme.of(context).dividerColor,
-            width: isSelected ? 2 : 1,
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
         ),
-        child: Column(
+        child: Row(
           children: [
             Icon(
               icon,
-              size: 48,
-              color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.onSurface,
+              color: isSelected ? Theme.of(context).colorScheme.primary : null,
             ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : null,
-                fontWeight: isSelected ? FontWeight.bold : null,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.bold : null,
+                    ),
+                  ),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              description,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: Theme.of(context).colorScheme.primary,
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildExportTypeSelection(StudentState studentState) {
+  Widget _buildTypeSection(StudentState studentState) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'انتخاب نوع خروجی',
-              style: Theme.of(context).textTheme.titleLarge,
+            Text('نوع خروجی', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            _buildTypeTile(
+              true,
+              Icons.people,
+              'همه کارنامه‌ها',
+              '${studentState.students.length} کارنامه',
+              true,
             ),
-            const SizedBox(height: 16),
-            RadioListTile<bool>(
-              title: const Text('خروجی همه کارنامه‌ها'),
-              subtitle: Text('${studentState.students.length} کارنامه'),
-              value: true,
-              groupValue: _exportAll,
-              onChanged: (value) {
-                setState(() {
-                  _exportAll = value!;
-                });
-              },
-            ),
-            RadioListTile<bool>(
-              title: const Text('خروجی کارنامه فعلی'),
-              subtitle: Text(
-                studentState.selectedStudent?.name ??
-                    'هیچ کارنامه‌ای انتخاب نشده',
-              ),
-              value: false,
-              groupValue: _exportAll,
-              onChanged: studentState.selectedStudent != null
-                  ? (value) {
-                      setState(() {
-                        _exportAll = value!;
-                      });
-                    }
-                  : null,
+            const SizedBox(height: 8),
+            _buildTypeTile(
+              false,
+              Icons.person,
+              'کارنامه فعلی',
+              studentState.selectedStudent?.name ?? 'انتخاب نشده',
+              studentState.selectedStudent != null,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypeTile(
+    bool value,
+    IconData icon,
+    String title,
+    String subtitle,
+    bool enabled,
+  ) {
+    final isSelected = _exportAll == value;
+    return InkWell(
+      onTap: enabled ? () => setState(() => _exportAll = value) : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.5,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? Theme.of(context).colorScheme.secondaryContainer
+                : null,
+            border: Border.all(
+              color: isSelected
+                  ? Theme.of(context).colorScheme.secondary
+                  : Theme.of(context).dividerColor,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.secondary
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : null,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Icon(
+                  Icons.check_circle,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildExportButton(StudentState studentState) {
-    final canExport = _exportAll || studentState.selectedStudent != null;
+    final hasPath = _pathController.text.isNotEmpty;
+    final canExport =
+        hasPath && (_exportAll || studentState.selectedStudent != null);
 
-    return ElevatedButton.icon(
-      onPressed: canExport ? _handleExport : null,
-      icon: const Icon(Icons.file_download),
-      label: Text(_exportAll ? 'خروجی همه کارنامه‌ها' : 'خروجی کارنامه فعلی'),
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+    return SizedBox(
+      height: 56,
+      child: ElevatedButton.icon(
+        onPressed: canExport ? _handleExport : null,
+        icon: const Icon(Icons.file_download, size: 28),
+        label: Text(
+          hasPath
+              ? (_exportAll
+                    ? 'خروجی ${studentState.students.length} کارنامه'
+                    : 'خروجی کارنامه فعلی')
+              : 'ابتدا مسیر را انتخاب کنید',
+          style: const TextStyle(fontSize: 16),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: canExport
+              ? Theme.of(context).colorScheme.primary
+              : null,
+          foregroundColor: canExport
+              ? Theme.of(context).colorScheme.onPrimary
+              : null,
+        ),
       ),
     );
   }
 
-  Widget _buildSuccessMessage(String message) {
+  Widget _buildMessage(String message, {required bool isError}) {
     return Card(
-      color: Theme.of(context).colorScheme.secondaryContainer,
+      color: isError
+          ? Theme.of(context).colorScheme.errorContainer
+          : Colors.green.shade50,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Row(
           children: [
             Icon(
-              Icons.check_circle,
-              color: Theme.of(context).colorScheme.secondary,
+              isError ? Icons.error : Icons.check_circle,
+              color: isError
+                  ? Theme.of(context).colorScheme.error
+                  : Colors.green,
             ),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
+            Expanded(child: Text(message)),
             IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () {
-                ref.read(exportProvider.notifier).clearMessages();
-              },
+              icon: const Icon(Icons.close, size: 18),
+              onPressed: () =>
+                  ref.read(exportProvider.notifier).clearMessages(),
             ),
           ],
         ),
@@ -298,48 +455,25 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     );
   }
 
-  Widget _buildErrorMessage(String message) {
-    return Card(
-      color: Theme.of(context).colorScheme.errorContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(Icons.error, color: Theme.of(context).colorScheme.error),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () {
-                ref.read(exportProvider.notifier).clearMessages();
-              },
-            ),
-          ],
-        ),
-      ),
+  Future<void> _selectPath() async {
+    final path = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'انتخاب مسیر ذخیره',
     );
+    if (path != null) {
+      _pathController.text = path;
+      setState(() {});
+    }
   }
 
   Future<void> _handleExport() async {
-    // انتخاب مسیر ذخیره
-    final outputPath = await FilePicker.platform.getDirectoryPath(
-      dialogTitle: 'انتخاب مسیر ذخیره فایل‌ها',
-    );
-
-    if (outputPath == null) return;
+    final outputPath = _pathController.text;
+    if (outputPath.isEmpty) return;
 
     if (_exportAll) {
-      // Export همه
       await ref
           .read(exportProvider.notifier)
           .exportAll(outputDirectory: outputPath, format: _selectedFormat);
     } else {
-      // Export تکی
       final reportCardState = ref.read(reportCardProvider);
       if (reportCardState.currentReportCard != null) {
         await ref

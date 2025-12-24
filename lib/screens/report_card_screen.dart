@@ -1,11 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
 import '../viewmodels/report_card_viewmodel.dart';
 import '../viewmodels/student_viewmodel.dart';
 import '../viewmodels/app_data_viewmodel.dart';
 import '../models/models.dart';
 import '../utils/report_card_template.dart';
+import '../widgets/drop_zone.dart';
+
+// Intent classes for keyboard shortcuts
+class _PreviousStudentIntent extends Intent {
+  const _PreviousStudentIntent();
+}
+
+class _NextStudentIntent extends Intent {
+  const _NextStudentIntent();
+}
+
+class _SaveIntent extends Intent {
+  const _SaveIntent();
+}
 
 class ReportCardScreen extends ConsumerWidget {
   const ReportCardScreen({super.key});
@@ -15,28 +30,64 @@ class ReportCardScreen extends ConsumerWidget {
     final reportCardState = ref.watch(reportCardProvider);
     final studentState = ref.watch(studentProvider);
 
-    return CallbackShortcuts(
-      bindings: _buildKeyboardShortcuts(ref, studentState),
-      child: Focus(
-        autofocus: true,
-        child: Scaffold(
-          appBar: AppBar(
-            title: _buildAppBarTitle(studentState),
-            actions: [
-              if (reportCardState.currentReportCard != null)
-                IconButton(
-                  icon: const Icon(Icons.save),
-                  tooltip: 'ذخیره',
-                  onPressed: () {
-                    ref.read(reportCardProvider.notifier).saveReportCard();
-                  },
-                ),
-            ],
+    return Shortcuts(
+      shortcuts: <ShortcutActivator, Intent>{
+        const SingleActivator(LogicalKeyboardKey.arrowLeft):
+            const _PreviousStudentIntent(),
+        const SingleActivator(LogicalKeyboardKey.arrowRight):
+            const _NextStudentIntent(),
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+            const _SaveIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _PreviousStudentIntent: CallbackAction<_PreviousStudentIntent>(
+            onInvoke: (_) {
+              if (studentState.selectedIndex != null &&
+                  studentState.selectedIndex! > 0) {
+                _navigateToPrevious(ref);
+              }
+              return null;
+            },
           ),
-          body: _buildBody(context, ref, reportCardState, studentState),
-          bottomNavigationBar: studentState.students.isNotEmpty
-              ? _buildNavigationBar(context, ref, studentState)
-              : null,
+          _NextStudentIntent: CallbackAction<_NextStudentIntent>(
+            onInvoke: (_) {
+              if (studentState.selectedIndex != null &&
+                  studentState.selectedIndex! <
+                      studentState.students.length - 1) {
+                _navigateToNext(ref);
+              }
+              return null;
+            },
+          ),
+          _SaveIntent: CallbackAction<_SaveIntent>(
+            onInvoke: (_) {
+              ref.read(reportCardProvider.notifier).saveReportCard();
+              return null;
+            },
+          ),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            appBar: AppBar(
+              title: _buildAppBarTitle(studentState),
+              actions: [
+                if (reportCardState.currentReportCard != null)
+                  IconButton(
+                    icon: const Icon(Icons.save),
+                    tooltip: 'ذخیره (Ctrl+S)',
+                    onPressed: () {
+                      ref.read(reportCardProvider.notifier).saveReportCard();
+                    },
+                  ),
+              ],
+            ),
+            body: _buildBody(context, ref, reportCardState, studentState),
+            bottomNavigationBar: studentState.students.isNotEmpty
+                ? _buildNavigationBar(context, ref, studentState)
+                : null,
+          ),
         ),
       ),
     );
@@ -142,34 +193,6 @@ class ReportCardScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  Map<ShortcutActivator, VoidCallback> _buildKeyboardShortcuts(
-    WidgetRef ref,
-    StudentState studentState,
-  ) {
-    return {
-      // Arrow Left: دانش‌آموز قبلی
-      const SingleActivator(LogicalKeyboardKey.arrowLeft): () {
-        if (studentState.selectedIndex != null &&
-            studentState.selectedIndex! > 0) {
-          _navigateToPrevious(ref);
-        }
-      },
-
-      // Arrow Right: دانش‌آموز بعدی
-      const SingleActivator(LogicalKeyboardKey.arrowRight): () {
-        if (studentState.selectedIndex != null &&
-            studentState.selectedIndex! < studentState.students.length - 1) {
-          _navigateToNext(ref);
-        }
-      },
-
-      // Ctrl+S: ذخیره
-      const SingleActivator(LogicalKeyboardKey.keyS, control: true): () {
-        ref.read(reportCardProvider.notifier).saveReportCard();
-      },
-    };
   }
 
   void _navigateToPrevious(WidgetRef ref) {
@@ -281,6 +304,22 @@ class ReportCardScreen extends ConsumerWidget {
 
           const SizedBox(height: 24),
 
+          // Comments Section
+          _buildCommentsSection(
+            context,
+            ref,
+            reportCardState.currentReportCard!,
+          ),
+          const SizedBox(height: 24),
+
+          // Signature Section
+          _buildSignatureSection(
+            context,
+            ref,
+            reportCardState.currentReportCard!,
+          ),
+          const SizedBox(height: 24),
+
           // Progress Info
           _buildProgressInfo(context, reportCardState),
         ],
@@ -322,9 +361,7 @@ class ReportCardScreen extends ConsumerWidget {
 
             // مقطع
             DropdownButtonFormField<String>(
-              key: ValueKey(
-                'grade_${reportCard.studentInfo.name}_${reportCard.studentInfo.grade}',
-              ),
+              key: ValueKey('grade_${reportCard.studentInfo.name}'),
               value: reportCard.studentInfo.grade?.isNotEmpty == true
                   ? reportCard.studentInfo.grade
                   : null,
@@ -349,9 +386,7 @@ class ReportCardScreen extends ConsumerWidget {
 
             // پایه
             DropdownButtonFormField<String>(
-              key: ValueKey(
-                'level_${reportCard.studentInfo.name}_${reportCard.studentInfo.level}',
-              ),
+              key: ValueKey('level_${reportCard.studentInfo.name}'),
               value: reportCard.studentInfo.level?.isNotEmpty == true
                   ? reportCard.studentInfo.level
                   : null,
@@ -376,9 +411,7 @@ class ReportCardScreen extends ConsumerWidget {
 
             // آموزشگاه
             DropdownButtonFormField<String>(
-              key: ValueKey(
-                'school_${reportCard.studentInfo.name}_${reportCard.studentInfo.school}',
-              ),
+              key: ValueKey('school_${reportCard.studentInfo.name}'),
               value: reportCard.studentInfo.school?.isNotEmpty == true
                   ? reportCard.studentInfo.school
                   : null,
@@ -403,9 +436,7 @@ class ReportCardScreen extends ConsumerWidget {
 
             // سرمربی
             DropdownButtonFormField<String>(
-              key: ValueKey(
-                'headCoach_${reportCard.studentInfo.name}_${reportCard.studentInfo.headCoach}',
-              ),
+              key: ValueKey('headCoach_${reportCard.studentInfo.name}'),
               value: reportCard.studentInfo.headCoach?.isNotEmpty == true
                   ? reportCard.studentInfo.headCoach
                   : null,
@@ -439,6 +470,7 @@ class ReportCardScreen extends ConsumerWidget {
     WidgetRef ref,
     ReportCard reportCard,
   ) {
+    final appData = ref.watch(appDataProvider);
     return Card(
       key: ValueKey('attendance_${reportCard.studentInfo.name}'),
       child: Padding(
@@ -458,7 +490,7 @@ class ReportCardScreen extends ConsumerWidget {
                 Expanded(
                   child: TextFormField(
                     key: ValueKey(
-                      'totalSessions_${reportCard.studentInfo.name}_${reportCard.attendanceInfo.totalSessions}',
+                      'totalSessions_${reportCard.studentInfo.name}',
                     ),
                     initialValue: reportCard.attendanceInfo.totalSessions
                         .toString(),
@@ -483,7 +515,7 @@ class ReportCardScreen extends ConsumerWidget {
                 Expanded(
                   child: TextFormField(
                     key: ValueKey(
-                      'attendedSessions_${reportCard.studentInfo.name}_${reportCard.attendanceInfo.attendedSessions}',
+                      'attendedSessions_${reportCard.studentInfo.name}',
                     ),
                     initialValue: reportCard.attendanceInfo.attendedSessions
                         .toString(),
@@ -504,26 +536,31 @@ class ReportCardScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: 16),
 
-                // ردیف عملکرد
+                // سطح عملکرد
                 Expanded(
-                  child: TextFormField(
+                  child: DropdownButtonFormField<String>(
                     key: ValueKey(
-                      'performanceRank_${reportCard.studentInfo.name}_${reportCard.attendanceInfo.performanceRank}',
+                      'performanceLevel_${reportCard.studentInfo.name}',
                     ),
-                    initialValue: reportCard.attendanceInfo.performanceRank
-                        .toString(),
+                    value:
+                        reportCard.attendanceInfo.performanceLevel?.isEmpty ??
+                            true
+                        ? null
+                        : reportCard.attendanceInfo.performanceLevel,
                     decoration: const InputDecoration(
-                      labelText: 'ردیف عملکرد',
+                      labelText: 'سطح عملکرد',
                       prefixIcon: Icon(Icons.emoji_events),
                     ),
-                    keyboardType: TextInputType.number,
+                    items: appData.performanceLevels.map((level) {
+                      return DropdownMenuItem<String>(
+                        value: level,
+                        child: Text(level),
+                      );
+                    }).toList(),
                     onChanged: (value) {
-                      final rank = int.tryParse(value);
-                      if (rank != null) {
-                        ref
-                            .read(reportCardProvider.notifier)
-                            .updateAttendanceInfo(performanceRank: rank);
-                      }
+                      ref
+                          .read(reportCardProvider.notifier)
+                          .updateAttendanceInfo(performanceLevel: value ?? '');
                     },
                   ),
                 ),
@@ -541,15 +578,25 @@ class ReportCardScreen extends ConsumerWidget {
     ReportCard reportCard,
   ) {
     final sectionNames = ReportCardTemplate.getSectionNames();
+    final selectedPerformanceLevel = reportCard.attendanceInfo.performanceLevel;
 
     return Column(
       children: sectionNames.map((sectionName) {
         final section = reportCard.sections[sectionName];
         if (section == null) return const SizedBox.shrink();
 
+        // فقط سطح انتخاب شده فعال است
+        final isActive = selectedPerformanceLevel == sectionName;
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
-          child: _buildSectionCard(context, ref, sectionName, section),
+          child: Opacity(
+            opacity: isActive ? 1.0 : 0.5,
+            child: IgnorePointer(
+              ignoring: !isActive,
+              child: _buildSectionCard(context, ref, sectionName, section),
+            ),
+          ),
         );
       }).toList(),
     );
@@ -561,15 +608,36 @@ class ReportCardScreen extends ConsumerWidget {
     String sectionName,
     SectionEvaluation section,
   ) {
+    final sectionTitle = ReportCardTemplate.getSectionTitle(sectionName);
+
     return Card(
       child: ExpansionTile(
-        title: Text(
-          sectionName,
-          style: Theme.of(context).textTheme.titleMedium,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              sectionName,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            if (sectionTitle.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                sectionTitle,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ],
+          ],
         ),
-        subtitle: Text(
-          '${section.techniques.where((t) => t.level != null).length} از ${section.techniques.length} تکنیک ارزیابی شده',
-          style: Theme.of(context).textTheme.bodySmall,
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            '${section.techniques.where((t) => t.level != null).length} از ${section.techniques.length} تکنیک ارزیابی شده',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ),
         children: [
           Padding(
@@ -724,6 +792,77 @@ class ReportCardScreen extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCommentsSection(
+    BuildContext context,
+    WidgetRef ref,
+    ReportCard reportCard,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('توضیحات', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: ValueKey('comments_${reportCard.studentInfo.name}'),
+              initialValue: reportCard.comments ?? '',
+              decoration: const InputDecoration(
+                labelText: 'توضیحات و یادداشت‌ها',
+                hintText: 'توضیحات مربی درباره عملکرد دانش‌آموز...',
+                prefixIcon: Icon(Icons.note),
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 5,
+              onChanged: (value) {
+                ref.read(reportCardProvider.notifier).updateComments(value);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignatureSection(
+    BuildContext context,
+    WidgetRef ref,
+    ReportCard reportCard,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('امضای مدیریت', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            FileDropArea(
+              allowedExtensions: const ['jpg', 'jpeg', 'png', 'gif', 'bmp'],
+              fileType: FileType.image,
+              onFileSelected: (filePath) {
+                ref
+                    .read(reportCardProvider.notifier)
+                    .updateSignatureImage(filePath);
+              },
+              currentFilePath: reportCard.signatureImagePath,
+              onClear: () {
+                ref
+                    .read(reportCardProvider.notifier)
+                    .updateSignatureImage(null);
+              },
+              title: 'تصویر امضا را انتخاب کنید',
+              subtitle: 'کلیک کنید یا تصویر را بکشید',
+              icon: Icons.draw,
+              height: 150,
+            ),
+          ],
         ),
       ),
     );

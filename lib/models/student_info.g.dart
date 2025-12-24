@@ -8,7 +8,7 @@ part of 'student_info.dart';
 
 class StudentInfoAdapter extends TypeAdapter<StudentInfo> {
   @override
-  final int typeId = 1;
+  final int typeId = 7;
 
   @override
   StudentInfo read(BinaryReader reader) {
@@ -22,13 +22,14 @@ class StudentInfoAdapter extends TypeAdapter<StudentInfo> {
       level: fields[2] as String?,
       school: fields[3] as String?,
       headCoach: fields[4] as String?,
+      sportField: fields[5] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, StudentInfo obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
@@ -38,7 +39,9 @@ class StudentInfoAdapter extends TypeAdapter<StudentInfo> {
       ..writeByte(3)
       ..write(obj.school)
       ..writeByte(4)
-      ..write(obj.headCoach);
+      ..write(obj.headCoach)
+      ..writeByte(5)
+      ..write(obj.sportField);
   }
 
   @override

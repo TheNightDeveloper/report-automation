@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 
 part 'attendance_info.g.dart';
 
-@HiveType(typeId: 2)
+@HiveType(typeId: 6)
 class AttendanceInfo {
   @HiveField(0)
   final int? totalSessions; // تعداد کل جلسات برگزار شده در سال تحصیلی
@@ -11,23 +11,29 @@ class AttendanceInfo {
   final int? attendedSessions; // تعداد جلسات حضور
 
   @HiveField(2)
-  final int? performanceRank; // ردیف عملکرد
+  final String? performanceLevel; // سطح عملکرد
+
+  @HiveField(3)
+  final String? sportField; // رشته ورزشی
 
   AttendanceInfo({
     this.totalSessions,
     this.attendedSessions,
-    this.performanceRank,
+    this.performanceLevel,
+    this.sportField,
   });
 
   AttendanceInfo copyWith({
     int? totalSessions,
     int? attendedSessions,
-    int? performanceRank,
+    String? performanceLevel,
+    String? sportField,
   }) {
     return AttendanceInfo(
       totalSessions: totalSessions ?? this.totalSessions,
       attendedSessions: attendedSessions ?? this.attendedSessions,
-      performanceRank: performanceRank ?? this.performanceRank,
+      performanceLevel: performanceLevel ?? this.performanceLevel,
+      sportField: sportField ?? this.sportField,
     );
   }
 
@@ -35,7 +41,8 @@ class AttendanceInfo {
     return {
       'totalSessions': totalSessions,
       'attendedSessions': attendedSessions,
-      'performanceRank': performanceRank,
+      'performanceLevel': performanceLevel,
+      'sportField': sportField,
     };
   }
 
@@ -43,7 +50,8 @@ class AttendanceInfo {
     return AttendanceInfo(
       totalSessions: json['totalSessions'] as int?,
       attendedSessions: json['attendedSessions'] as int?,
-      performanceRank: json['performanceRank'] as int?,
+      performanceLevel: json['performanceLevel'] as String?,
+      sportField: json['sportField'] as String?,
     );
   }
 }

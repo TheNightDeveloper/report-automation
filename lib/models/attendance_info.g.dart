@@ -8,7 +8,7 @@ part of 'attendance_info.dart';
 
 class AttendanceInfoAdapter extends TypeAdapter<AttendanceInfo> {
   @override
-  final int typeId = 2;
+  final int typeId = 6;
 
   @override
   AttendanceInfo read(BinaryReader reader) {
@@ -19,20 +19,23 @@ class AttendanceInfoAdapter extends TypeAdapter<AttendanceInfo> {
     return AttendanceInfo(
       totalSessions: fields[0] as int?,
       attendedSessions: fields[1] as int?,
-      performanceRank: fields[2] as int?,
+      performanceLevel: fields[2] as String?,
+      sportField: fields[3] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, AttendanceInfo obj) {
     writer
-      ..writeByte(3)
+      ..writeByte(4)
       ..writeByte(0)
       ..write(obj.totalSessions)
       ..writeByte(1)
       ..write(obj.attendedSessions)
       ..writeByte(2)
-      ..write(obj.performanceRank);
+      ..write(obj.performanceLevel)
+      ..writeByte(3)
+      ..write(obj.sportField);
   }
 
   @override

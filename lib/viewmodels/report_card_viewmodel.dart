@@ -126,7 +126,7 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
   void updateAttendanceInfo({
     int? totalSessions,
     int? attendedSessions,
-    int? performanceRank,
+    String? performanceLevel,
   }) {
     if (state.currentReportCard == null) return;
 
@@ -134,7 +134,7 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
       final updatedInfo = state.currentReportCard!.attendanceInfo.copyWith(
         totalSessions: totalSessions,
         attendedSessions: attendedSessions,
-        performanceRank: performanceRank,
+        performanceLevel: performanceLevel,
       );
 
       final updatedReportCard = state.currentReportCard!.copyWith(
@@ -191,6 +191,30 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
   // ذخیره خودکار
   void _autoSave() {
     saveReportCard();
+  }
+
+  // به‌روزرسانی توضیحات
+  void updateComments(String? comments) {
+    if (state.currentReportCard == null) return;
+
+    final updatedReportCard = state.currentReportCard!.copyWith(
+      comments: comments,
+    );
+
+    state = state.copyWith(currentReportCard: updatedReportCard);
+    _autoSave();
+  }
+
+  // به‌روزرسانی مسیر تصویر امضا
+  void updateSignatureImage(String? imagePath) {
+    if (state.currentReportCard == null) return;
+
+    final updatedReportCard = state.currentReportCard!.copyWith(
+      signatureImagePath: imagePath,
+    );
+
+    state = state.copyWith(currentReportCard: updatedReportCard);
+    _autoSave();
   }
 
   // پاک کردن پیام‌ها

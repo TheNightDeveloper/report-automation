@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 
 part 'student_info.g.dart';
 
-@HiveType(typeId: 1)
+@HiveType(typeId: 7)
 class StudentInfo {
   @HiveField(0)
   final String name;
@@ -19,12 +19,16 @@ class StudentInfo {
   @HiveField(4)
   final String? headCoach; // سرمربی
 
+  @HiveField(5)
+  final String? sportField; // رشته ورزشی
+
   StudentInfo({
     required this.name,
     this.grade,
     this.level,
     this.school,
     this.headCoach,
+    this.sportField,
   });
 
   StudentInfo copyWith({
@@ -33,6 +37,7 @@ class StudentInfo {
     String? level,
     String? school,
     String? headCoach,
+    String? sportField,
   }) {
     return StudentInfo(
       name: name ?? this.name,
@@ -40,6 +45,7 @@ class StudentInfo {
       level: level ?? this.level,
       school: school ?? this.school,
       headCoach: headCoach ?? this.headCoach,
+      sportField: sportField ?? this.sportField,
     );
   }
 
@@ -50,6 +56,7 @@ class StudentInfo {
       'level': level,
       'school': school,
       'headCoach': headCoach,
+      'sportField': sportField,
     };
   }
 
@@ -60,6 +67,7 @@ class StudentInfo {
       level: json['level'] as String?,
       school: json['school'] as String?,
       headCoach: json['headCoach'] as String?,
+      sportField: json['sportField'] as String?,
     );
   }
 }

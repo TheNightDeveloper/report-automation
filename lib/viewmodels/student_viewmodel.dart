@@ -76,16 +76,30 @@ class StudentNotifier extends Notifier<StudentState> {
     }
   }
 
-  // import از فایل Excel
-  Future<void> importFromExcel(String filePath) async {
+  // import از فایل Excel (جایگزینی)
+  Future<void> importFromExcel(String filePath, {bool append = false}) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final students = await _excelService.importStudentsFromExcel(filePath);
-      await _repository.saveStudents(students);
+      final newStudents = await _excelService.importStudentsFromExcel(filePath);
+
+      List<Student> finalStudents;
+      if (append) {
+        // اضافه کردن به لیست موجود (بدون تکراری)
+        final existingIds = state.students.map((s) => s.id).toSet();
+        final uniqueNewStudents = newStudents
+            .where((s) => !existingIds.contains(s.id))
+            .toList();
+        finalStudents = [...state.students, ...uniqueNewStudents];
+      } else {
+        // جایگزینی کامل
+        finalStudents = newStudents;
+      }
+
+      await _repository.saveStudents(finalStudents);
       state = state.copyWith(
-        students: students,
+        students: finalStudents,
         isLoading: false,
-        selectedIndex: students.isNotEmpty ? 0 : null,
+        selectedIndex: finalStudents.isNotEmpty ? 0 : null,
       );
     } catch (e) {
       state = state.copyWith(

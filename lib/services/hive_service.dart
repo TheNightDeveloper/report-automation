@@ -18,10 +18,10 @@ class HiveService {
     if (!Hive.isAdapterRegistered(0)) {
       Hive.registerAdapter(StudentAdapter());
     }
-    if (!Hive.isAdapterRegistered(1)) {
+    if (!Hive.isAdapterRegistered(7)) {
       Hive.registerAdapter(StudentInfoAdapter());
     }
-    if (!Hive.isAdapterRegistered(2)) {
+    if (!Hive.isAdapterRegistered(6)) {
       Hive.registerAdapter(AttendanceInfoAdapter());
     }
     if (!Hive.isAdapterRegistered(3)) {

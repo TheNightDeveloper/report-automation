@@ -30,6 +30,8 @@ dependencies:
   
   # PDF Generation
   pdf: ^3.11.1
+  syncfusion_flutter_pdf: ^28.1.33
+  syncfusion_flutter_xlsio: 
   
   # File Picker
   file_picker: ^10.3.7
@@ -42,8 +44,12 @@ dependencies:
   # Path Provider
   path_provider: ^2.1.5
   
+  # Desktop Drop
+  desktop_drop: ^0.7.0
+  
   # Google Fonts
   google_fonts: ^6.2.1
+  persian_number_utility: ^1.1.6
 
 dev_dependencies:
   flutter_test:
@@ -74,7 +80,9 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/fonts/
-
+    - sample_files/final report template.xlsx
+    - assets/image/
+    
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

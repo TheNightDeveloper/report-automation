@@ -28,9 +28,6 @@ class ReportCardService {
         attendance.attendedSessions! < 0) {
       return false;
     }
-    if (attendance.performanceRank != null && attendance.performanceRank! < 0) {
-      return false;
-    }
 
     // بررسی منطقی: تعداد حضور نباید بیشتر از کل جلسات باشد
     if (attendance.totalSessions != null &&
@@ -47,25 +44,44 @@ class ReportCardService {
     int totalFields = 0;
     int filledFields = 0;
 
-    // فیلدهای اطلاعات دانش‌آموز (5 فیلد)
-    totalFields += 5;
-    if (reportCard.studentInfo.name.trim().isNotEmpty) filledFields++;
-    if (reportCard.studentInfo.grade?.trim().isNotEmpty ?? false)
+    // فیلدهای اطلاعات دانش‌آموز (6 فیلد)
+    totalFields += 6;
+    if (reportCard.studentInfo.name.trim().isNotEmpty) {
       filledFields++;
-    if (reportCard.studentInfo.level?.trim().isNotEmpty ?? false)
+    }
+    if (reportCard.studentInfo.grade?.trim().isNotEmpty ?? false) {
       filledFields++;
-    if (reportCard.studentInfo.school?.trim().isNotEmpty ?? false)
+    }
+    if (reportCard.studentInfo.level?.trim().isNotEmpty ?? false) {
       filledFields++;
-    if (reportCard.studentInfo.headCoach?.trim().isNotEmpty ?? false)
+    }
+    if (reportCard.studentInfo.school?.trim().isNotEmpty ?? false) {
       filledFields++;
+    }
+    if (reportCard.studentInfo.headCoach?.trim().isNotEmpty ?? false) {
+      filledFields++;
+    }
+    if (reportCard.studentInfo.sportField?.trim().isNotEmpty ?? false) {
+      filledFields++;
+    }
 
-    // فیلدهای حضور (3 فیلد)
-    totalFields += 3;
-    if (reportCard.attendanceInfo.totalSessions != null) filledFields++;
-    if (reportCard.attendanceInfo.attendedSessions != null) filledFields++;
-    if (reportCard.attendanceInfo.performanceRank != null) filledFields++;
+    // فیلدهای حضور (4 فیلد)
+    totalFields += 4;
+    if (reportCard.attendanceInfo.totalSessions != null) {
+      filledFields++;
+    }
+    if (reportCard.attendanceInfo.attendedSessions != null) {
+      filledFields++;
+    }
+    if (reportCard.attendanceInfo.performanceLevel?.trim().isNotEmpty ??
+        false) {
+      filledFields++;
+    }
+    if (reportCard.attendanceInfo.sportField?.trim().isNotEmpty ?? false) {
+      filledFields++;
+    }
 
-    // تکنیک‌ها (45 تکنیک)
+    // تکنیک‌ها (63 تکنیک = 7 سطح × 9 تکنیک)
     for (final section in reportCard.sections.values) {
       for (final technique in section.techniques) {
         totalFields++;

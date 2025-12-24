@@ -15,6 +15,9 @@ class StudentRepository {
 
   Future<void> saveStudents(List<Student> students) async {
     await init();
+    // پاک کردن همه دانش‌آموزان قبلی
+    await _box!.clear();
+    // اضافه کردن دانش‌آموزان جدید
     final Map<String, Student> studentMap = {
       for (var student in students) student.id: student,
     };

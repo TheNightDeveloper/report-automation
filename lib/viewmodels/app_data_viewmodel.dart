@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class AppDataState {
   final List<String> grades;
   final List<String> levels;
+  final List<String> performanceLevels;
   final List<String> schools;
   final List<String> headCoaches;
   final bool isLoading;
@@ -11,6 +12,7 @@ class AppDataState {
   AppDataState({
     required this.grades,
     required this.levels,
+    required this.performanceLevels,
     required this.schools,
     required this.headCoaches,
     this.isLoading = false,
@@ -19,6 +21,7 @@ class AppDataState {
   AppDataState copyWith({
     List<String>? grades,
     List<String>? levels,
+    List<String>? performanceLevels,
     List<String>? schools,
     List<String>? headCoaches,
     bool? isLoading,
@@ -26,6 +29,7 @@ class AppDataState {
     return AppDataState(
       grades: grades ?? this.grades,
       levels: levels ?? this.levels,
+      performanceLevels: performanceLevels ?? this.performanceLevels,
       schools: schools ?? this.schools,
       headCoaches: headCoaches ?? this.headCoaches,
       isLoading: isLoading ?? this.isLoading,
@@ -41,6 +45,7 @@ class AppDataNotifier extends Notifier<AppDataState> {
     return AppDataState(
       grades: _getDefaultGrades(),
       levels: _getDefaultLevels(),
+      performanceLevels: _getDefaultPerformanceLevel(),
       schools: _getDefaultSchools(),
       headCoaches: _getDefaultHeadCoaches(),
     );
@@ -48,28 +53,40 @@ class AppDataNotifier extends Notifier<AppDataState> {
 
   // داده‌های پیش‌فرض مقاطع
   List<String> _getDefaultGrades() {
-    return ['پیش دبستانی', 'ابتدایی', 'متوسطه اول', 'متوسطه دوم'];
+    return ['پیش دبستانی', 'دبستان', 'دبیرستان', 'هنرستان'];
   }
 
   // داده‌های پیش‌فرض پایه‌ها
   List<String> _getDefaultLevels() {
     return [
-      'سال اول',
-      'سال دوم',
-      'سال سوم',
-      'سال چهارم',
-      'سال پنجم',
-      'سال ششم',
+      'پیش دبستانی',
+      'پایه اول',
+      'پایه دوم',
+      'پایه سوم',
+      'پایه چهارم',
+      'پایه پنجم',
+      'پایه ششم',
+      'پایه هفتم',
+      'پایه هشتم',
+      'پایه نهم',
+      'پایه دهم',
+      'پایه یازدهم',
+      'پایه دوازدهم',
     ];
+  }
+
+  // داده‌های پیش‌فرض پایه‌ها
+  List<String> _getDefaultPerformanceLevel() {
+    return ['سطح 1', 'سطح 2', 'سطح 3', 'سطح 4', 'سطح 5', 'سطح 6', 'سطح 7'];
   }
 
   // داده‌های پیش‌فرض آموزشگاه‌ها
   List<String> _getDefaultSchools() {
     return [
-      'آموزشگاه شنا ایدا',
-      'آموزشگاه شنا دلفین',
-      'آموزشگاه شنا آزادی',
-      'آموزشگاه شنا انقلاب',
+      'دبستان دولتی المهدی',
+      'دبستان غیر دولتی المهدی نوین',
+      'هنرستان المهدی',
+      'دبیرستان المهدی',
       'سایر',
     ];
   }
@@ -77,11 +94,10 @@ class AppDataNotifier extends Notifier<AppDataState> {
   // داده‌های پیش‌فرض سرمربیان
   List<String> _getDefaultHeadCoaches() {
     return [
-      'مربی احمدی',
-      'مربی محمدی',
-      'مربی رضایی',
-      'مربی کریمی',
-      'مربی حسینی',
+      'مربی مریم جاقوری ',
+      'مربی سمیه صفائی',
+      'مربی مژگان تقوی ',
+      'مربی منیره ساربان',
       'سایر',
     ];
   }
@@ -112,6 +128,27 @@ class AppDataNotifier extends Notifier<AppDataState> {
   void removeLevel(String level) {
     state = state.copyWith(
       levels: state.levels.where((l) => l != level).toList(),
+    );
+    _saveToCache();
+  }
+
+  // افزودن سطح عملکرد جدید
+  void addPerformanceLevel(String performanceLevel) {
+    if (performanceLevel.trim().isEmpty ||
+        state.performanceLevels.contains(performanceLevel))
+      return;
+    state = state.copyWith(
+      performanceLevels: [...state.performanceLevels, performanceLevel],
+    );
+    _saveToCache();
+  }
+
+  // حذف سطح عملکرد
+  void removePerformanceLevel(String performanceLevel) {
+    state = state.copyWith(
+      performanceLevels: state.performanceLevels
+          .where((p) => p != performanceLevel)
+          .toList(),
     );
     _saveToCache();
   }
@@ -167,6 +204,7 @@ class AppDataNotifier extends Notifier<AppDataState> {
     state = AppDataState(
       grades: _getDefaultGrades(),
       levels: _getDefaultLevels(),
+      performanceLevels: _getDefaultPerformanceLevel(),
       schools: _getDefaultSchools(),
       headCoaches: _getDefaultHeadCoaches(),
     );

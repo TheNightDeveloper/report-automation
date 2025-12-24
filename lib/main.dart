@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'utils/app_theme.dart';
@@ -12,6 +13,12 @@ void main() async {
 
   // راه‌اندازی Hive
   await Hive.initFlutter();
+
+  // 🔴 پاک کردن داده‌های قدیمی (فقط یک بار - بعد از اجرا این خطوط را کامنت کنید)
+  // await Hive.deleteBoxFromDisk('reportCards');
+  // await Hive.deleteBoxFromDisk('students');
+  // await Hive.deleteBoxFromDisk('appData');
+
   await HiveService.initialize();
 
   runApp(const ProviderScope(child: MyApp()));

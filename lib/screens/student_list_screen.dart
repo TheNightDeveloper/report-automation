@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:responsive_framework/responsive_framework.dart';
 import '../viewmodels/student_viewmodel.dart';
 import '../viewmodels/report_card_viewmodel.dart';
+import '../widgets/drop_zone.dart';
+
+enum ImportAction { append, replace }
 
 class StudentListScreen extends ConsumerStatefulWidget {
-  const StudentListScreen({super.key});
+  final VoidCallback? onStudentSelected;
+
+  const StudentListScreen({super.key, this.onStudentSelected});
 
   @override
   ConsumerState<StudentListScreen> createState() => _StudentListScreenState();
@@ -16,7 +20,6 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   @override
   void initState() {
     super.initState();
-    // بارگذاری لیست دانش‌آموزان
     Future.microtask(() {
       ref.read(studentProvider.notifier).loadStudents();
     });
@@ -30,7 +33,6 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
       appBar: AppBar(
         title: const Text('لیست دانش‌آموزان'),
         actions: [
-          // دکمه حذف همه
           if (studentState.students.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep),
@@ -49,242 +51,287 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   }
 
   Widget _buildBody(StudentState state) {
-    // نمایش Loading
     if (state.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // نمایش خطا
     if (state.errorMessage != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              state.errorMessage!,
-              style: Theme.of(context).textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                ref.read(studentProvider.notifier).clearError();
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('تلاش مجدد'),
-            ),
-          ],
-        ),
-      );
+      return _buildErrorState(state);
     }
 
-    // لیست خالی
     if (state.students.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.people_outline,
-              size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'هیچ دانش‌آموزی وجود ندارد',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'برای شروع، فایل Excel لیست دانش‌آموزان را بارگذاری کنید',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: _importExcel,
-              icon: const Icon(Icons.upload_file),
-              label: const Text('بارگذاری فایل'),
-            ),
-          ],
-        ),
-      );
+      return _buildEmptyState();
     }
 
-    // نمایش لیست
     return Column(
       children: [
-        // آمار
         _buildStats(state),
         const Divider(height: 1),
-
-        // لیست دانش‌آموزان
         Expanded(child: _buildStudentList(state)),
       ],
     );
   }
 
-  Widget _buildStats(StudentState state) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Row(
+  Widget _buildErrorState(StudentState state) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: _buildStatCard(
-              icon: Icons.people,
-              label: 'تعداد کل',
-              value: state.students.length.toString(),
-              color: Theme.of(context).colorScheme.primary,
-            ),
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: Theme.of(context).colorScheme.error,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildStatCard(
-              icon: Icons.check_circle,
-              label: 'تکمیل شده',
-              value: state.completedCount.toString(),
-              color: Theme.of(context).colorScheme.secondary,
-            ),
+          const SizedBox(height: 16),
+          Text(
+            state.errorMessage!,
+            style: Theme.of(context).textTheme.bodyLarge,
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildStatCard(
-              icon: Icons.pending,
-              label: 'در انتظار',
-              value: (state.students.length - state.completedCount).toString(),
-              color: Colors.orange,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: _buildStatCard(
-              icon: Icons.percent,
-              label: 'درصد پیشرفت',
-              value: '${state.completionPercentage.toStringAsFixed(0)}%',
-              color: Theme.of(context).colorScheme.tertiary,
-            ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => ref.read(studentProvider.notifier).clearError(),
+            icon: const Icon(Icons.refresh),
+            label: const Text('تلاش مجدد'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Card(
+  Widget _buildEmptyState() {
+    return Center(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(32),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 8),
+            // ناحیه drag & drop
+            FileDropArea(
+              allowedExtensions: const ['xlsx', 'xls', 'csv'],
+              onFileSelected: (filePath) => _handleFileSelected(filePath),
+              title: 'فایل Excel را انتخاب کنید',
+              subtitle: 'کلیک کنید یا فایل را بکشید',
+              icon: Icons.upload_file,
+              height: 180,
+            ),
+            const SizedBox(height: 16),
             Text(
-              value,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
+              'هیچ دانش‌آموزی وجود ندارد',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              'برای شروع، فایل Excel لیست دانش‌آموزان را بارگذاری کنید',
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStudentList(StudentState state) {
-    final responsive = ResponsiveBreakpoints.of(context);
-    final crossAxisCount = responsive.largerThan(TABLET)
-        ? 3
-        : responsive.equals(TABLET)
-        ? 2
-        : 1;
+  Future<void> _handleFileSelected(String filePath) async {
+    if (!mounted) return;
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        childAspectRatio: 3,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+    // اگر لیست دانش‌آموز وجود داره، بپرس چیکار کنه
+    bool shouldAppend = false;
+    final currentStudents = ref.read(studentProvider).students;
+
+    if (currentStudents.isNotEmpty) {
+      final action = await _showImportOptionsDialog();
+      if (action == null) return;
+      shouldAppend = action == ImportAction.append;
+    }
+
+    _showLoadingDialog();
+
+    await ref
+        .read(studentProvider.notifier)
+        .importFromExcel(filePath, append: shouldAppend);
+
+    if (!mounted) return;
+    Navigator.of(context).pop();
+
+    final state = ref.read(studentProvider);
+    if (state.errorMessage == null && state.students.isNotEmpty) {
+      final message = shouldAppend
+          ? 'دانش‌آموزان جدید اضافه شدند. مجموع: ${state.students.length} نفر'
+          : '${state.students.length} دانش‌آموز بارگذاری شد';
+      _showSuccessSnackBar(message);
+
+      final firstStudent = state.students.first;
+      _openReportCard(0, firstStudent.id, firstStudent.name);
+    }
+  }
+
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('در حال بارگذاری...'),
+              ],
+            ),
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _buildStats(StudentState state) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          _buildStatChip(Icons.people, '${state.students.length}', 'کل'),
+          const SizedBox(width: 12),
+          _buildStatChip(
+            Icons.check_circle,
+            '${state.completedCount}',
+            'تکمیل',
+            Colors.green,
+          ),
+          const SizedBox(width: 12),
+          _buildStatChip(
+            Icons.pending,
+            '${state.students.length - state.completedCount}',
+            'در انتظار',
+            Colors.orange,
+          ),
+          const Spacer(),
+          _buildProgressIndicator(state),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatChip(
+    IconData icon,
+    String value,
+    String label, [
+    Color? color,
+  ]) {
+    final chipColor = color ?? Theme.of(context).colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: chipColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: chipColor),
+          const SizedBox(width: 6),
+          Text(
+            value,
+            style: TextStyle(fontWeight: FontWeight.bold, color: chipColor),
+          ),
+          const SizedBox(width: 4),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressIndicator(StudentState state) {
+    return SizedBox(
+      width: 100,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '${state.completionPercentage.toStringAsFixed(0)}%',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 4),
+          LinearProgressIndicator(
+            value: state.completionPercentage / 100,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudentList(StudentState state) {
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
       itemCount: state.students.length,
       itemBuilder: (context, index) {
         final student = state.students[index];
         final isSelected = state.selectedIndex == index;
 
         return Card(
-          elevation: isSelected ? 4 : 1,
+          elevation: isSelected ? 3 : 1,
+          margin: const EdgeInsets.only(bottom: 8),
           color: isSelected
               ? Theme.of(context).colorScheme.primaryContainer
               : null,
-          child: InkWell(
-            onTap: () => _selectStudent(index),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // آیکون وضعیت
-                  Icon(
-                    student.isCompleted
-                        ? Icons.check_circle
-                        : Icons.radio_button_unchecked,
-                    color: student.isCompleted
-                        ? Theme.of(context).colorScheme.secondary
-                        : Theme.of(context).colorScheme.outline,
-                    size: 32,
-                  ),
-                  const SizedBox(width: 16),
-
-                  // نام دانش‌آموز
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          student.name,
-                          style: Theme.of(context).textTheme.titleMedium,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          student.isCompleted ? 'تکمیل شده' : 'در انتظار',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // دکمه ویرایش
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    tooltip: 'ویرایش کارنامه',
-                    onPressed: () => _editReportCard(student.id, student.name),
-                  ),
-                ],
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            leading: CircleAvatar(
+              backgroundColor: student.isCompleted
+                  ? Colors.green.withOpacity(0.2)
+                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Icon(
+                student.isCompleted ? Icons.check : Icons.person,
+                color: student.isCompleted
+                    ? Colors.green
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+            title: Text(
+              student.name,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              student.isCompleted ? 'کارنامه تکمیل شده' : 'در انتظار تکمیل',
+              style: TextStyle(
+                color: student.isCompleted
+                    ? Colors.green
+                    : Theme.of(context).colorScheme.outline,
+                fontSize: 12,
+              ),
+            ),
+            trailing: const Icon(Icons.chevron_left),
+            onTap: () => _openReportCard(index, student.id, student.name),
           ),
         );
       },
     );
   }
 
-  // Import Excel
+  void _openReportCard(int index, String studentId, String studentName) {
+    // انتخاب دانش‌آموز
+    ref.read(studentProvider.notifier).selectStudent(index);
+
+    // بارگذاری کارنامه
+    ref
+        .read(reportCardProvider.notifier)
+        .loadReportCard(studentId, studentName);
+
+    // اطلاع به parent برای تغییر تب (اگر callback داده شده)
+    if (widget.onStudentSelected != null) {
+      widget.onStudentSelected!();
+    }
+  }
+
   Future<void> _importExcel() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -294,64 +341,51 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
       );
 
       if (result != null && result.files.single.path != null) {
-        final filePath = result.files.single.path!;
-
-        if (!mounted) return;
-
-        // نمایش progress
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(
-            child: Card(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('در حال بارگذاری...'),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-
-        await ref.read(studentProvider.notifier).importFromExcel(filePath);
-
-        if (!mounted) return;
-        Navigator.of(context).pop(); // بستن dialog
-
-        final state = ref.read(studentProvider);
-        if (state.errorMessage == null) {
-          _showSuccessSnackBar(
-            'فایل با موفقیت بارگذاری شد. ${state.students.length} دانش‌آموز اضافه شد.',
-          );
-        }
+        await _handleFileSelected(result.files.single.path!);
       }
     } catch (e) {
       if (!mounted) return;
-      Navigator.of(context).pop(); // بستن dialog در صورت خطا
       _showErrorSnackBar('خطا در انتخاب فایل: ${e.toString()}');
     }
   }
 
-  void _selectStudent(int index) {
-    ref.read(studentProvider.notifier).selectStudent(index);
-  }
-
-  void _editReportCard(String studentId, String studentName) {
-    // بارگذاری کارنامه
-    ref
-        .read(reportCardProvider.notifier)
-        .loadReportCard(studentId, studentName);
-
-    // رفتن به صفحه کارنامه (تغییر tab در MainScreen)
-    // این کار باید از طریق navigation انجام شود
-    _showInfoSnackBar(
-      'کارنامه $studentName بارگذاری شد. به بخش کارنامه بروید.',
+  Future<ImportAction?> _showImportOptionsDialog() async {
+    return showDialog<ImportAction>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('بارگذاری فایل جدید'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'شما در حال حاضر ${ref.read(studentProvider).students.length} دانش‌آموز دارید.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            const Text('چه کاری انجام دهم؟'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('انصراف'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).pop(ImportAction.append),
+            icon: const Icon(Icons.add),
+            label: const Text('اضافه کردن به لیست'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).pop(ImportAction.replace),
+            icon: const Icon(Icons.sync),
+            label: const Text('جایگزینی کامل'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -360,9 +394,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف همه دانش‌آموزان'),
-        content: const Text(
-          'آیا مطمئن هستید که می‌خواهید همه دانش‌آموزان و کارنامه‌های آنها را حذف کنید؟\n\nاین عمل قابل بازگشت نیست!',
-        ),
+        content: const Text('آیا مطمئن هستید؟ این عمل قابل بازگشت نیست!'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -381,9 +413,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
 
     if (confirmed == true) {
       await ref.read(studentProvider.notifier).deleteAllStudents();
-      if (mounted) {
-        _showSuccessSnackBar('همه دانش‌آموزان حذف شدند');
-      }
+      if (mounted) _showSuccessSnackBar('همه دانش‌آموزان حذف شدند');
     }
   }
 
@@ -391,7 +421,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.secondary,
+        backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -404,12 +434,6 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
         backgroundColor: Theme.of(context).colorScheme.error,
         behavior: SnackBarBehavior.floating,
       ),
-    );
-  }
-
-  void _showInfoSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 }

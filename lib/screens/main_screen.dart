@@ -15,11 +15,17 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    StudentListScreen(),
-    ReportCardScreen(),
-    ExportScreen(),
-  ];
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      StudentListScreen(onStudentSelected: () => _onItemTapped(1)),
+      const ReportCardScreen(),
+      const ExportScreen(),
+    ];
+  }
 
   final List<NavigationItem> _navItems = const [
     NavigationItem(

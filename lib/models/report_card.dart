@@ -19,11 +19,19 @@ class ReportCard {
   @HiveField(3)
   final Map<String, SectionEvaluation> sections;
 
+  @HiveField(4)
+  final String? comments; // توضیحات
+
+  @HiveField(5)
+  final String? signatureImagePath; // مسیر تصویر امضای مدیریت
+
   ReportCard({
     required this.studentId,
     required this.studentInfo,
     required this.attendanceInfo,
     required this.sections,
+    this.comments,
+    this.signatureImagePath,
   });
 
   ReportCard copyWith({
@@ -31,12 +39,16 @@ class ReportCard {
     StudentInfo? studentInfo,
     AttendanceInfo? attendanceInfo,
     Map<String, SectionEvaluation>? sections,
+    String? comments,
+    String? signatureImagePath,
   }) {
     return ReportCard(
       studentId: studentId ?? this.studentId,
       studentInfo: studentInfo ?? this.studentInfo,
       attendanceInfo: attendanceInfo ?? this.attendanceInfo,
       sections: sections ?? this.sections,
+      comments: comments ?? this.comments,
+      signatureImagePath: signatureImagePath ?? this.signatureImagePath,
     );
   }
 
@@ -46,6 +58,8 @@ class ReportCard {
       'studentInfo': studentInfo.toJson(),
       'attendanceInfo': attendanceInfo.toJson(),
       'sections': sections.map((key, value) => MapEntry(key, value.toJson())),
+      'comments': comments,
+      'signatureImagePath': signatureImagePath,
     };
   }
 
@@ -64,6 +78,8 @@ class ReportCard {
           SectionEvaluation.fromJson(value as Map<String, dynamic>),
         ),
       ),
+      comments: json['comments'] as String?,
+      signatureImagePath: json['signatureImagePath'] as String?,
     );
   }
 }
