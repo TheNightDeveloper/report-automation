@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 // State class برای مدیریت داده‌های برنامه
 class AppDataState {
   final List<String> grades;
   final List<String> levels;
-  final List<String> performanceLevels;
   final List<String> schools;
   final List<String> headCoaches;
   final bool isLoading;
@@ -12,7 +12,6 @@ class AppDataState {
   AppDataState({
     required this.grades,
     required this.levels,
-    required this.performanceLevels,
     required this.schools,
     required this.headCoaches,
     this.isLoading = false,
@@ -21,7 +20,6 @@ class AppDataState {
   AppDataState copyWith({
     List<String>? grades,
     List<String>? levels,
-    List<String>? performanceLevels,
     List<String>? schools,
     List<String>? headCoaches,
     bool? isLoading,
@@ -29,7 +27,6 @@ class AppDataState {
     return AppDataState(
       grades: grades ?? this.grades,
       levels: levels ?? this.levels,
-      performanceLevels: performanceLevels ?? this.performanceLevels,
       schools: schools ?? this.schools,
       headCoaches: headCoaches ?? this.headCoaches,
       isLoading: isLoading ?? this.isLoading,
@@ -39,16 +36,28 @@ class AppDataState {
 
 // Notifier برای مدیریت داده‌های برنامه
 class AppDataNotifier extends Notifier<AppDataState> {
+  static const String _boxName = 'app_data';
+  Box? _box;
+
   @override
   AppDataState build() {
-    // بارگذاری داده‌های پیش‌فرض
+    // بارگذاری داده‌ها از کش
+    _initializeBox();
     return AppDataState(
       grades: _getDefaultGrades(),
       levels: _getDefaultLevels(),
-      performanceLevels: _getDefaultPerformanceLevel(),
       schools: _getDefaultSchools(),
       headCoaches: _getDefaultHeadCoaches(),
     );
+  }
+
+  Future<void> _initializeBox() async {
+    try {
+      _box = await Hive.openBox(_boxName);
+      await loadFromCache();
+    } catch (e) {
+      // در صورت خطا، از داده‌های پیش‌فرض استفاده می‌شود
+    }
   }
 
   // داده‌های پیش‌فرض مقاطع
@@ -73,11 +82,6 @@ class AppDataNotifier extends Notifier<AppDataState> {
       'پایه یازدهم',
       'پایه دوازدهم',
     ];
-  }
-
-  // داده‌های پیش‌فرض پایه‌ها
-  List<String> _getDefaultPerformanceLevel() {
-    return ['سطح 1', 'سطح 2', 'سطح 3', 'سطح 4', 'سطح 5', 'سطح 6', 'سطح 7'];
   }
 
   // داده‌های پیش‌فرض آموزشگاه‌ها
@@ -132,27 +136,6 @@ class AppDataNotifier extends Notifier<AppDataState> {
     _saveToCache();
   }
 
-  // افزودن سطح عملکرد جدید
-  void addPerformanceLevel(String performanceLevel) {
-    if (performanceLevel.trim().isEmpty ||
-        state.performanceLevels.contains(performanceLevel))
-      return;
-    state = state.copyWith(
-      performanceLevels: [...state.performanceLevels, performanceLevel],
-    );
-    _saveToCache();
-  }
-
-  // حذف سطح عملکرد
-  void removePerformanceLevel(String performanceLevel) {
-    state = state.copyWith(
-      performanceLevels: state.performanceLevels
-          .where((p) => p != performanceLevel)
-          .toList(),
-    );
-    _saveToCache();
-  }
-
   // افزودن آموزشگاه جدید
   void addSchool(String school) {
     if (school.trim().isEmpty || state.schools.contains(school)) return;
@@ -185,18 +168,44 @@ class AppDataNotifier extends Notifier<AppDataState> {
     _saveToCache();
   }
 
-  // ذخیره در کش (برای آینده)
+  // ذخیره در کش
   Future<void> _saveToCache() async {
-    // TODO: پیاده‌سازی ذخیره‌سازی در Hive یا SharedPreferences
-    // این متد در آینده برای ذخیره دائمی داده‌ها استفاده می‌شود
+    if (_box == null) return;
+    try {
+      await _box!.put('grades', state.grades);
+      await _box!.put('levels', state.levels);
+      await _box!.put('schools', state.schools);
+      await _box!.put('headCoaches', state.headCoaches);
+    } catch (e) {
+      // خطا در ذخیره‌سازی
+    }
   }
 
-  // بارگذاری از کش (برای آینده)
+  // بارگذاری از کش
   Future<void> loadFromCache() async {
-    // TODO: پیاده‌سازی بارگذاری از Hive یا SharedPreferences
-    state = state.copyWith(isLoading: true);
-    // بارگذاری داده‌ها
-    state = state.copyWith(isLoading: false);
+    if (_box == null) return;
+    try {
+      state = state.copyWith(isLoading: true);
+
+      final grades = _box!.get('grades', defaultValue: _getDefaultGrades());
+      final levels = _box!.get('levels', defaultValue: _getDefaultLevels());
+      final schools = _box!.get('schools', defaultValue: _getDefaultSchools());
+      final headCoaches = _box!.get(
+        'headCoaches',
+        defaultValue: _getDefaultHeadCoaches(),
+      );
+
+      state = state.copyWith(
+        grades: List<String>.from(grades),
+        levels: List<String>.from(levels),
+        schools: List<String>.from(schools),
+        headCoaches: List<String>.from(headCoaches),
+        isLoading: false,
+      );
+    } catch (e) {
+      // در صورت خطا، از داده‌های پیش‌فرض استفاده می‌شود
+      state = state.copyWith(isLoading: false);
+    }
   }
 
   // بازنشانی به داده‌های پیش‌فرض
@@ -204,7 +213,6 @@ class AppDataNotifier extends Notifier<AppDataState> {
     state = AppDataState(
       grades: _getDefaultGrades(),
       levels: _getDefaultLevels(),
-      performanceLevels: _getDefaultPerformanceLevel(),
       schools: _getDefaultSchools(),
       headCoaches: _getDefaultHeadCoaches(),
     );

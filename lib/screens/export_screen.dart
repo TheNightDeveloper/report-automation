@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import '../viewmodels/export_viewmodel.dart';
 import '../viewmodels/student_viewmodel.dart';
 import '../viewmodels/report_card_viewmodel.dart';
+import '../viewmodels/sport_viewmodel.dart';
 import '../services/export_service.dart';
 
 class ExportScreen extends ConsumerStatefulWidget {
@@ -469,19 +470,38 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     final outputPath = _pathController.text;
     if (outputPath.isEmpty) return;
 
+    // گرفتن رشته ورزشی انتخاب شده
+    final sportState = ref.read(sportProvider);
+    final selectedSport = sportState.selectedSport;
+
+    if (selectedSport == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('لطفاً ابتدا یک رشته ورزشی انتخاب کنید'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     if (_exportAll) {
       await ref
           .read(exportProvider.notifier)
-          .exportAll(outputDirectory: outputPath, format: _selectedFormat);
+          .exportAllWithSport(
+            outputDirectory: outputPath,
+            format: _selectedFormat,
+            sport: selectedSport,
+          );
     } else {
       final reportCardState = ref.read(reportCardProvider);
       if (reportCardState.currentReportCard != null) {
         await ref
             .read(exportProvider.notifier)
-            .exportSingle(
+            .exportSingleWithSport(
               reportCard: reportCardState.currentReportCard!,
               outputDirectory: outputPath,
               format: _selectedFormat,
+              sport: selectedSport,
             );
       }
     }

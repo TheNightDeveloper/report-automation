@@ -160,9 +160,6 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
           ? 'دانش‌آموزان جدید اضافه شدند. مجموع: ${state.students.length} نفر'
           : '${state.students.length} دانش‌آموز بارگذاری شد';
       _showSuccessSnackBar(message);
-
-      final firstStudent = state.students.first;
-      _openReportCard(0, firstStudent.id, firstStudent.name);
     }
   }
 
@@ -225,7 +222,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: chipColor.withOpacity(0.1),
+        color: chipColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -287,7 +284,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
             ),
             leading: CircleAvatar(
               backgroundColor: student.isCompleted
-                  ? Colors.green.withOpacity(0.2)
+                  ? Colors.green.withValues(alpha: 0.2)
                   : Theme.of(context).colorScheme.surfaceContainerHighest,
               child: Icon(
                 student.isCompleted ? Icons.check : Icons.person,

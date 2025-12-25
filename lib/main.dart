@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'utils/app_theme.dart';
 import 'services/hive_service.dart';
+import 'services/migration_service.dart';
+import 'repositories/sport_repository.dart';
+import 'repositories/report_card_repository.dart';
 import 'screens/main_screen.dart';
 
 void main() async {
@@ -20,6 +22,28 @@ void main() async {
   // await Hive.deleteBoxFromDisk('appData');
 
   await HiveService.initialize();
+
+  // اجرای migration در صورت نیاز
+  try {
+    final sportRepository = SportRepository();
+    final reportCardRepository = ReportCardRepository();
+    final migrationService = MigrationService(
+      sportRepository,
+      reportCardRepository,
+    );
+
+    final needsMigration = await migrationService.needsMigration();
+    if (needsMigration) {
+      print('شروع migration...');
+      await migrationService.migrateToV2();
+      print('Migration با موفقیت کامل شد');
+    } else {
+      print('نیازی به migration نیست');
+    }
+  } catch (e) {
+    print('خطا در migration: $e');
+    // ادامه اجرای برنامه حتی در صورت خطا
+  }
 
   runApp(const ProviderScope(child: MyApp()));
 }

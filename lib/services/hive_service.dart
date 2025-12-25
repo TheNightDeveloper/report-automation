@@ -14,7 +14,7 @@ class HiveService {
     // Initialize Hive
     await Hive.initFlutter();
 
-    // Register adapters
+    // Register adapters - existing
     if (!Hive.isAdapterRegistered(0)) {
       Hive.registerAdapter(StudentAdapter());
     }
@@ -32,6 +32,23 @@ class HiveService {
     }
     if (!Hive.isAdapterRegistered(5)) {
       Hive.registerAdapter(ReportCardAdapter());
+    }
+
+    // Register new adapters
+    if (!Hive.isAdapterRegistered(8)) {
+      Hive.registerAdapter(SportAdapter());
+    }
+    if (!Hive.isAdapterRegistered(9)) {
+      Hive.registerAdapter(LevelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(10)) {
+      Hive.registerAdapter(TechniqueAdapter());
+    }
+    if (!Hive.isAdapterRegistered(11)) {
+      Hive.registerAdapter(PerformanceRatingAdapter());
+    }
+    if (!Hive.isAdapterRegistered(12)) {
+      Hive.registerAdapter(LevelEvaluationAdapter());
     }
 
     _initialized = true;

@@ -5,8 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import '../viewmodels/report_card_viewmodel.dart';
 import '../viewmodels/student_viewmodel.dart';
 import '../viewmodels/app_data_viewmodel.dart';
+import '../viewmodels/sport_viewmodel.dart';
 import '../models/models.dart';
-import '../utils/report_card_template.dart';
 import '../widgets/drop_zone.dart';
 
 // Intent classes for keyboard shortcuts
@@ -127,7 +127,7 @@ class ReportCardScreen extends ConsumerWidget {
         color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
@@ -255,7 +255,9 @@ class ReportCardScreen extends ConsumerWidget {
             Icon(
               Icons.description_outlined,
               size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 24),
             Text(
@@ -333,6 +335,8 @@ class ReportCardScreen extends ConsumerWidget {
     ReportCard reportCard,
   ) {
     final appData = ref.watch(appDataProvider);
+    final sportState = ref.watch(sportProvider);
+    final selectedSport = sportState.selectedSport;
 
     return Card(
       key: ValueKey(reportCard.studentInfo.name),
@@ -341,9 +345,43 @@ class ReportCardScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'اطلاعات دانش‌آموز',
-              style: Theme.of(context).textTheme.titleLarge,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'اطلاعات دانش‌آموز',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                // نمایش رشته ورزشی
+                if (selectedSport != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.blue),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.sports, size: 16, color: Colors.blue),
+                        const SizedBox(width: 6),
+                        Text(
+                          selectedSport.name,
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 16),
 
@@ -362,7 +400,7 @@ class ReportCardScreen extends ConsumerWidget {
             // مقطع
             DropdownButtonFormField<String>(
               key: ValueKey('grade_${reportCard.studentInfo.name}'),
-              value: reportCard.studentInfo.grade?.isNotEmpty == true
+              initialValue: reportCard.studentInfo.grade?.isNotEmpty == true
                   ? reportCard.studentInfo.grade
                   : null,
               decoration: const InputDecoration(
@@ -387,7 +425,7 @@ class ReportCardScreen extends ConsumerWidget {
             // پایه
             DropdownButtonFormField<String>(
               key: ValueKey('level_${reportCard.studentInfo.name}'),
-              value: reportCard.studentInfo.level?.isNotEmpty == true
+              initialValue: reportCard.studentInfo.level?.isNotEmpty == true
                   ? reportCard.studentInfo.level
                   : null,
               decoration: const InputDecoration(
@@ -412,7 +450,7 @@ class ReportCardScreen extends ConsumerWidget {
             // آموزشگاه
             DropdownButtonFormField<String>(
               key: ValueKey('school_${reportCard.studentInfo.name}'),
-              value: reportCard.studentInfo.school?.isNotEmpty == true
+              initialValue: reportCard.studentInfo.school?.isNotEmpty == true
                   ? reportCard.studentInfo.school
                   : null,
               decoration: const InputDecoration(
@@ -437,7 +475,7 @@ class ReportCardScreen extends ConsumerWidget {
             // سرمربی
             DropdownButtonFormField<String>(
               key: ValueKey('headCoach_${reportCard.studentInfo.name}'),
-              value: reportCard.studentInfo.headCoach?.isNotEmpty == true
+              initialValue: reportCard.studentInfo.headCoach?.isNotEmpty == true
                   ? reportCard.studentInfo.headCoach
                   : null,
               decoration: const InputDecoration(
@@ -470,7 +508,9 @@ class ReportCardScreen extends ConsumerWidget {
     WidgetRef ref,
     ReportCard reportCard,
   ) {
-    final appData = ref.watch(appDataProvider);
+    final sportState = ref.watch(sportProvider);
+    final selectedSport = sportState.selectedSport;
+
     return Card(
       key: ValueKey('attendance_${reportCard.studentInfo.name}'),
       child: Padding(
@@ -542,7 +582,7 @@ class ReportCardScreen extends ConsumerWidget {
                     key: ValueKey(
                       'performanceLevel_${reportCard.studentInfo.name}',
                     ),
-                    value:
+                    initialValue:
                         reportCard.attendanceInfo.performanceLevel?.isEmpty ??
                             true
                         ? null
@@ -551,12 +591,14 @@ class ReportCardScreen extends ConsumerWidget {
                       labelText: 'سطح عملکرد',
                       prefixIcon: Icon(Icons.emoji_events),
                     ),
-                    items: appData.performanceLevels.map((level) {
-                      return DropdownMenuItem<String>(
-                        value: level,
-                        child: Text(level),
-                      );
-                    }).toList(),
+                    items:
+                        selectedSport?.levels.map((level) {
+                          return DropdownMenuItem<String>(
+                            value: level.name,
+                            child: Text(level.name),
+                          );
+                        }).toList() ??
+                        [],
                     onChanged: (value) {
                       ref
                           .read(reportCardProvider.notifier)
@@ -577,75 +619,151 @@ class ReportCardScreen extends ConsumerWidget {
     WidgetRef ref,
     ReportCard reportCard,
   ) {
-    final sectionNames = ReportCardTemplate.getSectionNames();
-    final selectedPerformanceLevel = reportCard.attendanceInfo.performanceLevel;
+    final sportState = ref.watch(sportProvider);
+    final selectedSport = sportState.selectedSport;
+
+    if (selectedSport == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: Text(
+              'رشته ورزشی بارگذاری نشده است',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // مرتب‌سازی سطوح بر اساس order
+    final sortedLevels = List<Level>.from(selectedSport.levels)
+      ..sort((a, b) => a.order.compareTo(b.order));
 
     return Column(
-      children: sectionNames.map((sectionName) {
-        final section = reportCard.sections[sectionName];
-        if (section == null) return const SizedBox.shrink();
-
-        // فقط سطح انتخاب شده فعال است
-        final isActive = selectedPerformanceLevel == sectionName;
+      children: sortedLevels.map((level) {
+        final levelEvaluation = reportCard.levelEvaluations?[level.id];
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
-          child: Opacity(
-            opacity: isActive ? 1.0 : 0.5,
-            child: IgnorePointer(
-              ignoring: !isActive,
-              child: _buildSectionCard(context, ref, sectionName, section),
-            ),
+          child: _buildLevelCard(
+            context,
+            ref,
+            level,
+            levelEvaluation,
+            selectedSport,
           ),
         );
       }).toList(),
     );
   }
 
-  Widget _buildSectionCard(
+  Widget _buildLevelCard(
     BuildContext context,
     WidgetRef ref,
-    String sectionName,
-    SectionEvaluation section,
+    Level level,
+    LevelEvaluation? levelEvaluation,
+    Sport sport,
   ) {
-    final sectionTitle = ReportCardTemplate.getSectionTitle(sectionName);
+    // مرتب‌سازی تکنیک‌ها بر اساس order
+    final sortedTechniques = List<Technique>.from(level.techniques)
+      ..sort((a, b) => a.order.compareTo(b.order));
+
+    // محاسبه تعداد تکنیک‌های ارزیابی شده
+    int evaluatedCount = 0;
+    if (levelEvaluation != null) {
+      for (final technique in sortedTechniques) {
+        final techEval = levelEvaluation.techniqueEvaluations[technique.id];
+        if (techEval?.performanceRatingId != null) {
+          evaluatedCount++;
+        }
+      }
+    }
+
+    // یافتن تکنیک‌های orphaned (حذف شده)
+    final orphanedTechniques = <String, TechniqueEvaluation>{};
+    if (levelEvaluation != null) {
+      for (final entry in levelEvaluation.techniqueEvaluations.entries) {
+        final techniqueId = entry.key;
+        final evaluation = entry.value;
+        // اگر تکنیک در لیست فعلی نیست، orphaned است
+        if (!sortedTechniques.any((t) => t.id == techniqueId)) {
+          orphanedTechniques[techniqueId] = evaluation;
+        }
+      }
+    }
 
     return Card(
       child: ExpansionTile(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              sectionName,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            if (sectionTitle.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                sectionTitle,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-            ],
-          ],
+        title: Text(
+          level.name,
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: Text(
-            '${section.techniques.where((t) => t.level != null).length} از ${section.techniques.length} تکنیک ارزیابی شده',
-            style: Theme.of(context).textTheme.bodySmall,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$evaluatedCount از ${sortedTechniques.length} تکنیک ارزیابی شده',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (orphanedTechniques.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '⚠️ ${orphanedTechniques.length} تکنیک حذف شده',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-              children: section.techniques.map((technique) {
-                return _buildTechniqueRow(context, ref, sectionName, technique);
-              }).toList(),
+              children: [
+                // تکنیک‌های فعال
+                ...sortedTechniques.map((technique) {
+                  final techEval =
+                      levelEvaluation?.techniqueEvaluations[technique.id];
+                  return _buildTechniqueRow(
+                    context,
+                    ref,
+                    level.id,
+                    technique,
+                    techEval,
+                    sport,
+                  );
+                }),
+                // تکنیک‌های orphaned
+                if (orphanedTechniques.isNotEmpty) ...[
+                  const Divider(height: 32),
+                  Text(
+                    'تکنیک‌های حذف شده',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...orphanedTechniques.entries.map((entry) {
+                    return _buildOrphanedTechniqueRow(
+                      context,
+                      ref,
+                      level.id,
+                      entry.key,
+                      entry.value,
+                      sport,
+                    );
+                  }),
+                ],
+              ],
             ),
           ),
         ],
@@ -656,8 +774,10 @@ class ReportCardScreen extends ConsumerWidget {
   Widget _buildTechniqueRow(
     BuildContext context,
     WidgetRef ref,
-    String sectionName,
-    TechniqueEvaluation technique,
+    String levelId,
+    Technique technique,
+    TechniqueEvaluation? evaluation,
+    Sport sport,
   ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -673,7 +793,7 @@ class ReportCardScreen extends ConsumerWidget {
             ),
             child: Center(
               child: Text(
-                technique.number.toString(),
+                technique.order.toString(),
                 style: Theme.of(context).textTheme.labelLarge,
               ),
             ),
@@ -683,69 +803,63 @@ class ReportCardScreen extends ConsumerWidget {
           // نام تکنیک
           Expanded(
             child: Text(
-              technique.techniqueName,
+              technique.name,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
           const SizedBox(width: 12),
 
-          // Radio Buttons
-          _buildPerformanceRadios(context, ref, sectionName, technique),
+          // Performance Rating Buttons
+          _buildPerformanceRatingButtons(
+            context,
+            ref,
+            levelId,
+            technique,
+            evaluation,
+            sport,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPerformanceRadios(
+  Widget _buildPerformanceRatingButtons(
     BuildContext context,
     WidgetRef ref,
-    String sectionName,
-    TechniqueEvaluation technique,
+    String levelId,
+    Technique technique,
+    TechniqueEvaluation? evaluation,
+    Sport sport,
   ) {
+    // مرتب‌سازی performance ratings بر اساس order
+    final sortedRatings = List<PerformanceRating>.from(sport.performanceRatings)
+      ..sort((a, b) => a.order.compareTo(b.order));
+
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildRadioButton(
+      children: sortedRatings.map((rating) {
+        return _buildRatingButton(
           context,
           ref,
-          sectionName,
+          levelId,
           technique,
-          PerformanceLevel.excellent,
-          'عالی',
-          Colors.green,
-        ),
-        _buildRadioButton(
-          context,
-          ref,
-          sectionName,
-          technique,
-          PerformanceLevel.good,
-          'خوب',
-          Colors.blue,
-        ),
-        _buildRadioButton(
-          context,
-          ref,
-          sectionName,
-          technique,
-          PerformanceLevel.average,
-          'متوسط',
-          Colors.orange,
-        ),
-      ],
+          evaluation,
+          rating,
+        );
+      }).toList(),
     );
   }
 
-  Widget _buildRadioButton(
+  Widget _buildRatingButton(
     BuildContext context,
     WidgetRef ref,
-    String sectionName,
-    TechniqueEvaluation technique,
-    PerformanceLevel level,
-    String label,
-    Color color,
+    String levelId,
+    Technique technique,
+    TechniqueEvaluation? evaluation,
+    PerformanceRating rating,
   ) {
-    final isSelected = technique.level == level;
+    final isSelected = evaluation?.performanceRatingId == rating.id;
+    final color = _parseColor(rating.color);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -753,17 +867,17 @@ class ReportCardScreen extends ConsumerWidget {
         onTap: () {
           ref
               .read(reportCardProvider.notifier)
-              .updateTechniqueEvaluation(
-                sectionName: sectionName,
-                techniqueNumber: technique.number,
-                performanceLevel: isSelected ? null : level,
+              .updateTechniqueEvaluationNew(
+                levelId: levelId,
+                techniqueId: technique.id,
+                performanceRatingId: isSelected ? null : rating.id,
               );
         },
         borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? color.withOpacity(0.2) : null,
+            color: isSelected ? color.withValues(alpha: 0.2) : null,
             border: Border.all(
               color: isSelected ? color : Theme.of(context).dividerColor,
               width: isSelected ? 2 : 1,
@@ -784,7 +898,7 @@ class ReportCardScreen extends ConsumerWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                label,
+                rating.name,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: isSelected ? color : null,
                   fontWeight: isSelected ? FontWeight.bold : null,
@@ -793,6 +907,129 @@ class ReportCardScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Color _parseColor(String? colorString) {
+    if (colorString == null || colorString.isEmpty) {
+      return Colors.grey;
+    }
+
+    try {
+      // Remove # if present
+      final hexColor = colorString.replaceAll('#', '');
+      // Parse hex color
+      return Color(int.parse('FF$hexColor', radix: 16));
+    } catch (e) {
+      // Default to grey if parsing fails
+      return Colors.grey;
+    }
+  }
+
+  Widget _buildOrphanedTechniqueRow(
+    BuildContext context,
+    WidgetRef ref,
+    String levelId,
+    String techniqueId,
+    TechniqueEvaluation evaluation,
+    Sport sport,
+  ) {
+    // یافتن نام performance rating
+    String ratingName = 'نامشخص';
+    if (evaluation.performanceRatingId != null) {
+      final rating = sport.performanceRatings.firstWhere(
+        (r) => r.id == evaluation.performanceRatingId,
+        orElse: () => PerformanceRating(id: '', name: 'حذف شده', order: 0),
+      );
+      ratingName = rating.name;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.1),
+        border: Border.all(color: Colors.orange),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning, color: Colors.orange, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'تکنیک حذف شده',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'ارزیابی: $ratingName',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              _showOrphanedTechniqueDialog(context, ref, levelId, techniqueId);
+            },
+            icon: const Icon(Icons.delete, size: 16),
+            label: const Text('حذف'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOrphanedTechniqueDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String levelId,
+    String techniqueId,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف ارزیابی'),
+        content: const Text(
+          'این تکنیک از رشته ورزشی حذف شده است. آیا می‌خواهید ارزیابی آن را نیز حذف کنید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref
+                  .read(reportCardProvider.notifier)
+                  .updateTechniqueEvaluationNew(
+                    levelId: levelId,
+                    techniqueId: techniqueId,
+                    performanceRatingId: null,
+                  );
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('حذف'),
+          ),
+        ],
       ),
     );
   }

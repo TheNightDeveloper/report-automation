@@ -5,3 +5,8 @@ export 'attendance_info.dart';
 export 'technique_evaluation.dart';
 export 'section_evaluation.dart';
 export 'report_card.dart';
+export 'technique.dart';
+export 'level.dart';
+export 'performance_rating.dart';
+export 'sport.dart';
+export 'level_evaluation.dart';

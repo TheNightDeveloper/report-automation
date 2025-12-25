@@ -20,16 +20,18 @@ class ReportCardAdapter extends TypeAdapter<ReportCard> {
       studentId: fields[0] as String,
       studentInfo: fields[1] as StudentInfo,
       attendanceInfo: fields[2] as AttendanceInfo,
-      sections: (fields[3] as Map).cast<String, SectionEvaluation>(),
+      sections: (fields[3] as Map?)?.cast<String, SectionEvaluation>(),
       comments: fields[4] as String?,
       signatureImagePath: fields[5] as String?,
+      sportId: fields[6] as String?,
+      levelEvaluations: (fields[7] as Map?)?.cast<String, LevelEvaluation>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, ReportCard obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.studentId)
       ..writeByte(1)
@@ -41,7 +43,11 @@ class ReportCardAdapter extends TypeAdapter<ReportCard> {
       ..writeByte(4)
       ..write(obj.comments)
       ..writeByte(5)
-      ..write(obj.signatureImagePath);
+      ..write(obj.signatureImagePath)
+      ..writeByte(6)
+      ..write(obj.sportId)
+      ..writeByte(7)
+      ..write(obj.levelEvaluations);
   }
 
   @override

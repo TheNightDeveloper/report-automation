@@ -2,6 +2,7 @@ import 'package:hive/hive.dart';
 import 'student_info.dart';
 import 'attendance_info.dart';
 import 'section_evaluation.dart';
+import 'level_evaluation.dart';
 
 part 'report_card.g.dart';
 
@@ -17,7 +18,7 @@ class ReportCard {
   final AttendanceInfo attendanceInfo;
 
   @HiveField(3)
-  final Map<String, SectionEvaluation> sections;
+  final Map<String, SectionEvaluation>? sections; // قدیمی - برای migration
 
   @HiveField(4)
   final String? comments; // توضیحات
@@ -25,13 +26,21 @@ class ReportCard {
   @HiveField(5)
   final String? signatureImagePath; // مسیر تصویر امضای مدیریت
 
+  @HiveField(6)
+  final String? sportId; // جدید - reference to Sport
+
+  @HiveField(7)
+  final Map<String, LevelEvaluation>? levelEvaluations; // جدید - ساختار جدید
+
   ReportCard({
     required this.studentId,
     required this.studentInfo,
     required this.attendanceInfo,
-    required this.sections,
+    this.sections, // nullable برای سازگاری
     this.comments,
     this.signatureImagePath,
+    this.sportId,
+    this.levelEvaluations,
   });
 
   ReportCard copyWith({
@@ -41,6 +50,8 @@ class ReportCard {
     Map<String, SectionEvaluation>? sections,
     String? comments,
     String? signatureImagePath,
+    String? sportId,
+    Map<String, LevelEvaluation>? levelEvaluations,
   }) {
     return ReportCard(
       studentId: studentId ?? this.studentId,
@@ -49,6 +60,8 @@ class ReportCard {
       sections: sections ?? this.sections,
       comments: comments ?? this.comments,
       signatureImagePath: signatureImagePath ?? this.signatureImagePath,
+      sportId: sportId ?? this.sportId,
+      levelEvaluations: levelEvaluations ?? this.levelEvaluations,
     );
   }
 
@@ -57,9 +70,17 @@ class ReportCard {
       'studentId': studentId,
       'studentInfo': studentInfo.toJson(),
       'attendanceInfo': attendanceInfo.toJson(),
-      'sections': sections.map((key, value) => MapEntry(key, value.toJson())),
+      if (sections != null)
+        'sections': sections!.map(
+          (key, value) => MapEntry(key, value.toJson()),
+        ),
       'comments': comments,
       'signatureImagePath': signatureImagePath,
+      'sportId': sportId,
+      if (levelEvaluations != null)
+        'levelEvaluations': levelEvaluations!.map(
+          (key, value) => MapEntry(key, value.toJson()),
+        ),
     };
   }
 
@@ -72,14 +93,25 @@ class ReportCard {
       attendanceInfo: AttendanceInfo.fromJson(
         json['attendanceInfo'] as Map<String, dynamic>,
       ),
-      sections: (json['sections'] as Map<String, dynamic>).map(
-        (key, value) => MapEntry(
-          key,
-          SectionEvaluation.fromJson(value as Map<String, dynamic>),
-        ),
-      ),
+      sections: json['sections'] != null
+          ? (json['sections'] as Map<String, dynamic>).map(
+              (key, value) => MapEntry(
+                key,
+                SectionEvaluation.fromJson(value as Map<String, dynamic>),
+              ),
+            )
+          : null,
       comments: json['comments'] as String?,
       signatureImagePath: json['signatureImagePath'] as String?,
+      sportId: json['sportId'] as String?,
+      levelEvaluations: json['levelEvaluations'] != null
+          ? (json['levelEvaluations'] as Map<String, dynamic>).map(
+              (key, value) => MapEntry(
+                key,
+                LevelEvaluation.fromJson(value as Map<String, dynamic>),
+              ),
+            )
+          : null,
     );
   }
 }

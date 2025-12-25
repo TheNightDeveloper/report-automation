@@ -1,44 +1,41 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'technique_evaluation.dart';
+part of 'technique.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class TechniqueEvaluationAdapter extends TypeAdapter<TechniqueEvaluation> {
+class TechniqueAdapter extends TypeAdapter<Technique> {
   @override
-  final int typeId = 3;
+  final int typeId = 10;
 
   @override
-  TechniqueEvaluation read(BinaryReader reader) {
+  Technique read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return TechniqueEvaluation(
-      number: fields[0] as int?,
-      techniqueName: fields[1] as String?,
-      performanceLevel: fields[2] as String?,
-      techniqueId: fields[3] as String?,
-      performanceRatingId: fields[4] as String?,
+    return Technique(
+      id: fields[0] as String,
+      name: fields[1] as String,
+      order: fields[2] as int,
+      description: fields[3] as String?,
     );
   }
 
   @override
-  void write(BinaryWriter writer, TechniqueEvaluation obj) {
+  void write(BinaryWriter writer, Technique obj) {
     writer
-      ..writeByte(5)
-      ..writeByte(0)
-      ..write(obj.number)
-      ..writeByte(1)
-      ..write(obj.techniqueName)
-      ..writeByte(2)
-      ..write(obj.performanceLevel)
-      ..writeByte(3)
-      ..write(obj.techniqueId)
       ..writeByte(4)
-      ..write(obj.performanceRatingId);
+      ..writeByte(0)
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.name)
+      ..writeByte(2)
+      ..write(obj.order)
+      ..writeByte(3)
+      ..write(obj.description);
   }
 
   @override
@@ -47,7 +44,7 @@ class TechniqueEvaluationAdapter extends TypeAdapter<TechniqueEvaluation> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is TechniqueEvaluationAdapter &&
+      other is TechniqueAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

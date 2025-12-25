@@ -82,11 +82,13 @@ class ReportCardService {
     }
 
     // تکنیک‌ها (63 تکنیک = 7 سطح × 9 تکنیک)
-    for (final section in reportCard.sections.values) {
-      for (final technique in section.techniques) {
-        totalFields++;
-        if (technique.performanceLevel != null) {
-          filledFields++;
+    if (reportCard.sections != null) {
+      for (final section in reportCard.sections!.values) {
+        for (final technique in section.techniques) {
+          totalFields++;
+          if (technique.performanceLevel != null) {
+            filledFields++;
+          }
         }
       }
     }
@@ -103,14 +105,16 @@ class ReportCardService {
 
     // حداقل یک تکنیک باید ارزیابی شده باشد
     bool hasAnyEvaluation = false;
-    for (final section in reportCard.sections.values) {
-      for (final technique in section.techniques) {
-        if (technique.performanceLevel != null) {
-          hasAnyEvaluation = true;
-          break;
+    if (reportCard.sections != null) {
+      for (final section in reportCard.sections!.values) {
+        for (final technique in section.techniques) {
+          if (technique.performanceLevel != null) {
+            hasAnyEvaluation = true;
+            break;
+          }
         }
+        if (hasAnyEvaluation) break;
       }
-      if (hasAnyEvaluation) break;
     }
 
     return hasAnyEvaluation;
@@ -155,7 +159,9 @@ class ReportCardService {
     int techniqueNumber,
     PerformanceLevel? level,
   ) {
-    final sections = Map<String, SectionEvaluation>.from(reportCard.sections);
+    if (reportCard.sections == null) return reportCard;
+
+    final sections = Map<String, SectionEvaluation>.from(reportCard.sections!);
     final section = sections[sectionName];
 
     if (section == null) return reportCard;
@@ -181,8 +187,10 @@ class ReportCardService {
 
   /// دریافت تعداد کل تکنیک‌های ارزیابی شده
   int getTotalEvaluatedTechniquesCount(ReportCard reportCard) {
+    if (reportCard.sections == null) return 0;
+
     int count = 0;
-    for (final section in reportCard.sections.values) {
+    for (final section in reportCard.sections!.values) {
       count += getEvaluatedTechniquesCount(section);
     }
     return count;

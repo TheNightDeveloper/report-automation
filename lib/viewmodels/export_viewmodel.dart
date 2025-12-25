@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../repositories/report_card_repository.dart';
+import '../repositories/sport_repository.dart';
 import '../services/export_service.dart';
 
 // State class برای مدیریت export
@@ -48,12 +49,54 @@ class ExportState {
 class ExportNotifier extends Notifier<ExportState> {
   late final ExportService _exportService;
   late final ReportCardRepository _reportCardRepository;
+  late final SportRepository _sportRepository;
 
   @override
   ExportState build() {
     _exportService = ExportService();
     _reportCardRepository = ReportCardRepository();
+    _sportRepository = SportRepository();
     return ExportState();
+  }
+
+  // export تکی با رشته ورزشی مشخص
+  Future<void> exportSingleWithSport({
+    required ReportCard reportCard,
+    required String outputDirectory,
+    required ExportFormat format,
+    required Sport sport,
+  }) async {
+    state = state.copyWith(
+      isExporting: true,
+      errorMessage: null,
+      successMessage: null,
+      exportedFiles: [],
+    );
+
+    try {
+      final filePath = format == ExportFormat.pdf
+          ? await _exportService.exportToPDF(
+              reportCard: reportCard,
+              sport: sport,
+              outputDirectory: outputDirectory,
+            )
+          : await _exportService.exportToExcel(
+              reportCard: reportCard,
+              sport: sport,
+              outputDirectory: outputDirectory,
+            );
+
+      state = state.copyWith(
+        isExporting: false,
+        exportedFiles: [filePath],
+        successMessage: 'فایل با موفقیت ذخیره شد:\n$filePath',
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isExporting: false,
+        errorMessage: 'خطا در export: ${e.toString()}',
+      );
+    }
   }
 
   // export تکی
@@ -70,13 +113,32 @@ class ExportNotifier extends Notifier<ExportState> {
     );
 
     try {
+      // بارگذاری Sport مرتبط با کارنامه
+      Sport? sport;
+      if (reportCard.sportId != null) {
+        sport = await _sportRepository.getSport(reportCard.sportId!);
+      }
+
+      // اگر Sport یافت نشد، از رشته پیش‌فرض استفاده کن
+      sport ??= await _sportRepository.getDefaultSport();
+
+      if (sport == null) {
+        state = state.copyWith(
+          isExporting: false,
+          errorMessage: 'رشته ورزشی یافت نشد',
+        );
+        return;
+      }
+
       final filePath = format == ExportFormat.pdf
           ? await _exportService.exportToPDF(
               reportCard: reportCard,
+              sport: sport,
               outputDirectory: outputDirectory,
             )
           : await _exportService.exportToExcel(
               reportCard: reportCard,
+              sport: sport,
               outputDirectory: outputDirectory,
             );
 
@@ -128,8 +190,16 @@ class ExportNotifier extends Notifier<ExportState> {
         return;
       }
 
+      // بارگذاری تمام رشته‌های ورزشی
+      final allSports = await _sportRepository.getAllSports();
+      final sportsMap = <String, Sport>{};
+      for (final sport in allSports) {
+        sportsMap[sport.id] = sport;
+      }
+
       final exportedFiles = await _exportService.batchExport(
         reportCards: reportCards,
+        sportsMap: sportsMap,
         outputDirectory: outputDirectory,
         format: format,
         onProgress: (current, total) {
@@ -151,6 +221,75 @@ class ExportNotifier extends Notifier<ExportState> {
       state = state.copyWith(
         isExporting: false,
         errorMessage: 'خطا در export دسته‌جمعی: ${e.toString()}',
+      );
+    }
+  }
+
+  // export همه کارنامه‌ها با رشته ورزشی مشخص
+  Future<void> exportAllWithSport({
+    required String outputDirectory,
+    required ExportFormat format,
+    required Sport sport,
+  }) async {
+    state = state.copyWith(
+      isExporting: true,
+      errorMessage: null,
+      successMessage: null,
+      exportedFiles: [],
+    );
+
+    try {
+      final reportCards = await _reportCardRepository.loadAllReportCards();
+
+      if (reportCards.isEmpty) {
+        state = state.copyWith(
+          isExporting: false,
+          errorMessage: 'هیچ کارنامه‌ای برای export یافت نشد',
+        );
+        return;
+      }
+
+      state = state.copyWith(
+        totalItems: reportCards.length,
+        currentItem: 0,
+        progress: 0.0,
+      );
+
+      // استفاده از رشته ورزشی انتخاب شده برای همه کارنامه‌ها
+      final sportsMap = <String, Sport>{sport.id: sport};
+
+      // همچنین کارنامه‌هایی که sportId ندارند را با این رشته export می‌کنیم
+      final updatedReportCards = reportCards.map((rc) {
+        if (rc.sportId == null || rc.sportId!.isEmpty) {
+          return rc.copyWith(sportId: sport.id);
+        }
+        return rc;
+      }).toList();
+
+      final exportedFiles = await _exportService.batchExport(
+        reportCards: updatedReportCards,
+        sportsMap: sportsMap,
+        outputDirectory: outputDirectory,
+        format: format,
+        onProgress: (current, total) {
+          state = state.copyWith(
+            currentItem: current,
+            totalItems: total,
+            progress: current / total,
+          );
+        },
+      );
+
+      state = state.copyWith(
+        isExporting: false,
+        exportedFiles: exportedFiles,
+        successMessage:
+            '${exportedFiles.length} فایل با موفقیت ذخیره شد در:\n$outputDirectory',
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isExporting: false,
+        errorMessage: 'خطا در export همه کارنامه‌ها: ${e.toString()}',
       );
     }
   }
@@ -184,8 +323,16 @@ class ExportNotifier extends Notifier<ExportState> {
         progress: 0.0,
       );
 
+      // بارگذاری تمام رشته‌های ورزشی
+      final allSports = await _sportRepository.getAllSports();
+      final sportsMap = <String, Sport>{};
+      for (final sport in allSports) {
+        sportsMap[sport.id] = sport;
+      }
+
       final exportedFiles = await _exportService.batchExport(
         reportCards: reportCards,
+        sportsMap: sportsMap,
         outputDirectory: outputDirectory,
         format: format,
         onProgress: (current, total) {
@@ -217,8 +364,12 @@ class ExportNotifier extends Notifier<ExportState> {
   }
 
   // محاسبه حجم تقریبی
-  int estimateFileSize(ReportCard reportCard, ExportFormat format) {
-    return _exportService.estimateFileSize(reportCard, format);
+  int estimateFileSize(
+    ReportCard reportCard,
+    Sport sport,
+    ExportFormat format,
+  ) {
+    return _exportService.estimateFileSize(reportCard, sport, format);
   }
 
   // پاک کردن پیام‌ها

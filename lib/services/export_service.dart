@@ -4,7 +4,6 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
 import '../models/models.dart';
-import '../utils/report_card_template.dart';
 
 class ExportService {
   List<int>? _fontData;
@@ -57,6 +56,7 @@ class ExportService {
   /// خروجی PDF برای یک کارنامه
   Future<String> exportToPDF({
     required ReportCard reportCard,
+    required Sport sport,
     required String outputDirectory,
   }) async {
     try {
@@ -118,14 +118,15 @@ class ExportService {
       yPos += 15;
 
       // جدول‌های سطوح
-      yPos = _drawAllSections(
+      yPos = _drawAllSectionsNew(
         document,
         page,
         graphics,
         pageWidth,
         fontSmallBold,
         fontSmall,
-        reportCard.sections,
+        reportCard,
+        sport,
         yPos,
       );
 
@@ -306,14 +307,15 @@ class ExportService {
     return yPos + 45;
   }
 
-  double _drawAllSections(
+  double _drawAllSectionsNew(
     PdfDocument document,
     PdfPage initialPage,
     PdfGraphics initialGraphics,
     double pageWidth,
     PdfFont fontBold,
     PdfFont font,
-    Map<String, SectionEvaluation> sections,
+    ReportCard reportCard,
+    Sport sport,
     double yPos,
   ) {
     final colors = [
@@ -331,12 +333,10 @@ class ExportService {
     PdfGraphics g = initialGraphics;
     double pageHeight = currentPage.getClientSize().height;
 
-    for (final section in sections.values) {
-      final sectionTitle = ReportCardTemplate.getSectionTitle(
-        section.sectionName,
-      );
+    // استفاده از ساختار جدید Sport
+    for (final level in sport.levels) {
+      final levelEvaluation = reportCard.levelEvaluations?[level.id];
       final bgColor = colors[colorIndex % colors.length];
-      final techniques = section.techniques;
 
       // بررسی فضای کافی (حدود 75 پیکسل برای هر سطح)
       if (yPos + 75 > pageHeight - 20) {
@@ -352,12 +352,8 @@ class ExportService {
         bounds: Rect.fromLTWH(0, yPos, pageWidth, 16),
       );
 
-      String titleText = sectionTitle.isNotEmpty
-          ? '${section.sectionName} - $sectionTitle'
-          : section.sectionName;
-
       g.drawString(
-        titleText,
+        level.name,
         fontBold,
         bounds: Rect.fromLTWH(5, yPos + 2, pageWidth - 10, 14),
         format: PdfStringFormat(
@@ -368,8 +364,17 @@ class ExportService {
 
       yPos += 16;
 
-      // رسم جدول 3×3
-      yPos = _drawGrid(g, pageWidth, fontBold, font, techniques, yPos);
+      // رسم جدول 3×3 با تکنیک‌های جدید
+      yPos = _drawGridNew(
+        g,
+        pageWidth,
+        fontBold,
+        font,
+        level.techniques,
+        levelEvaluation,
+        sport.performanceRatings,
+        yPos,
+      );
       yPos += 5;
       colorIndex++;
     }
@@ -377,20 +382,34 @@ class ExportService {
     return yPos;
   }
 
-  double _drawGrid(
+  double _drawGridNew(
     PdfGraphics g,
     double pageWidth,
     PdfFont fontBold,
     PdfFont font,
-    List<TechniqueEvaluation> techniques,
+    List<Technique> techniques,
+    LevelEvaluation? levelEvaluation,
+    List<PerformanceRating> performanceRatings,
     double yPos,
   ) {
+    if (techniques.isEmpty) return yPos;
+
     const double rowHeight = 14;
     const double headerHeight = 13;
-    final double groupWidth = pageWidth / 3;
+
+    // محاسبه تعداد ستون‌ها بر اساس تعداد تکنیک‌ها
+    final int techniqueCount = techniques.length;
+    final int numColumns = (techniqueCount <= 3)
+        ? 1
+        : (techniqueCount <= 6)
+        ? 2
+        : 3;
+    final int rowsPerColumn = (techniqueCount / numColumns).ceil();
+
+    final double groupWidth = pageWidth / numColumns;
     final double numW = groupWidth * 0.12;
     final double techW = groupWidth * 0.48;
-    final double lvlW = groupWidth * 0.133;
+    final double ratingW = groupWidth * 0.133;
 
     final centerFmt = PdfStringFormat(
       alignment: PdfTextAlignment.center,
@@ -408,10 +427,10 @@ class ExportService {
       bounds: Rect.fromLTWH(0, yPos, pageWidth, headerHeight),
     );
 
-    // هدر 3 گروه - RTL (گروه 0 سمت راست، گروه 2 سمت چپ)
-    for (int grp = 0; grp < 3; grp++) {
-      // گروه 0 در سمت راست صفحه (x بزرگتر)
-      final double gx = (2 - grp) * groupWidth;
+    // هدر برای هر ستون - RTL (ستون 0 سمت راست، ستون آخر سمت چپ)
+    for (int col = 0; col < numColumns; col++) {
+      // ستون 0 در سمت راست صفحه (x بزرگتر)
+      final double gx = (numColumns - 1 - col) * groupWidth;
       g.drawString(
         'ردیف',
         fontBold,
@@ -426,37 +445,37 @@ class ExportService {
       g.drawString(
         'تکنیک',
         fontBold,
-        bounds: Rect.fromLTWH(gx + lvlW * 3, yPos + 1, techW, headerHeight),
+        bounds: Rect.fromLTWH(gx + ratingW * 3, yPos + 1, techW, headerHeight),
         format: centerFmt,
       );
-      g.drawString(
-        'عالی',
-        fontBold,
-        bounds: Rect.fromLTWH(gx + lvlW * 2, yPos + 1, lvlW, headerHeight),
-        format: centerFmt,
-      );
-      g.drawString(
-        'خوب',
-        fontBold,
-        bounds: Rect.fromLTWH(gx + lvlW, yPos + 1, lvlW, headerHeight),
-        format: centerFmt,
-      );
-      g.drawString(
-        'متوسط',
-        fontBold,
-        bounds: Rect.fromLTWH(gx, yPos + 1, lvlW, headerHeight),
-        format: centerFmt,
-      );
+
+      // نمایش نام‌های سطوح عملکرد به ترتیب معکوس (بهترین در سمت راست)
+      final sortedRatings = List<PerformanceRating>.from(performanceRatings)
+        ..sort((a, b) => b.order.compareTo(a.order));
+
+      for (int i = 0; i < 3 && i < sortedRatings.length; i++) {
+        g.drawString(
+          sortedRatings[i].name,
+          fontBold,
+          bounds: Rect.fromLTWH(
+            gx + ratingW * (2 - i),
+            yPos + 1,
+            ratingW,
+            headerHeight,
+          ),
+          format: centerFmt,
+        );
+      }
     }
 
     yPos += headerHeight;
 
-    // رسم خطوط عمودی جداکننده بین گروه‌ها و ستون‌ها
-    final double gridHeight = headerHeight + (3 * rowHeight);
+    // رسم خطوط عمودی جداکننده بین ستون‌ها
+    final double gridHeight = headerHeight + (rowsPerColumn * rowHeight);
     final double gridStartY = yPos - headerHeight;
 
-    // خطوط بین 3 گروه اصلی
-    for (int i = 1; i < 3; i++) {
+    // خطوط بین ستون‌های اصلی
+    for (int i = 1; i < numColumns; i++) {
       final double x = i * groupWidth;
       g.drawLine(
         PdfPen(PdfColor(150, 150, 150), width: 1),
@@ -465,54 +484,46 @@ class ExportService {
       );
     }
 
-    // خطوط داخل هر گروه (بین ستون‌ها)
-    for (int grp = 0; grp < 3; grp++) {
-      final double gx = grp * groupWidth;
-      // خط بین متوسط و خوب
-      g.drawLine(
-        PdfPen(PdfColor(180, 180, 180), width: 0.5),
-        Offset(gx + lvlW, gridStartY),
-        Offset(gx + lvlW, gridStartY + gridHeight),
-      );
-      // خط بین خوب و عالی
-      g.drawLine(
-        PdfPen(PdfColor(180, 180, 180), width: 0.5),
-        Offset(gx + lvlW * 2, gridStartY),
-        Offset(gx + lvlW * 2, gridStartY + gridHeight),
-      );
-      // خط بین عالی و تکنیک
-      g.drawLine(
-        PdfPen(PdfColor(180, 180, 180), width: 0.5),
-        Offset(gx + lvlW * 3, gridStartY),
-        Offset(gx + lvlW * 3, gridStartY + gridHeight),
-      );
+    // خطوط داخل هر ستون (بین فیلدها)
+    for (int col = 0; col < numColumns; col++) {
+      final double gx = col * groupWidth;
+      // خط بین rating columns
+      for (int i = 1; i < 4; i++) {
+        g.drawLine(
+          PdfPen(PdfColor(180, 180, 180), width: 0.5),
+          Offset(gx + ratingW * i, gridStartY),
+          Offset(gx + ratingW * i, gridStartY + gridHeight),
+        );
+      }
       // خط بین تکنیک و ردیف
       g.drawLine(
         PdfPen(PdfColor(180, 180, 180), width: 0.5),
-        Offset(gx + lvlW * 3 + techW, gridStartY),
-        Offset(gx + lvlW * 3 + techW, gridStartY + gridHeight),
+        Offset(gx + ratingW * 3 + techW, gridStartY),
+        Offset(gx + ratingW * 3 + techW, gridStartY + gridHeight),
       );
     }
 
-    // 3 ردیف داده
-    for (int row = 0; row < 3; row++) {
+    // رسم ردیف‌های داده
+    for (int row = 0; row < rowsPerColumn; row++) {
       g.drawRectangle(
         pen: PdfPen(PdfColor(180, 180, 180), width: 0.5),
         bounds: Rect.fromLTWH(0, yPos, pageWidth, rowHeight),
       );
 
-      for (int grp = 0; grp < 3; grp++) {
-        // محاسبه صحیح ایندکس: گروه 0 شامل تکنیک‌های 0,1,2 - گروه 1 شامل 3,4,5 - گروه 2 شامل 6,7,8
-        final int idx = grp * 3 + row;
-        // گروه 0 در سمت راست صفحه (x بزرگتر)
-        final double gx = (2 - grp) * groupWidth;
+      for (int col = 0; col < numColumns; col++) {
+        // محاسبه ایندکس تکنیک
+        final int idx = col * rowsPerColumn + row;
+        // ستون 0 در سمت راست صفحه (x بزرگتر)
+        final double gx = (numColumns - 1 - col) * groupWidth;
 
         if (idx < techniques.length) {
-          final tech = techniques[idx];
+          final technique = techniques[idx];
+          final techniqueEval =
+              levelEvaluation?.techniqueEvaluations[technique.id];
 
           // ردیف
           g.drawString(
-            _toPersianNumber(tech.number),
+            _toPersianNumber(technique.order),
             font,
             bounds: Rect.fromLTWH(
               gx + groupWidth - numW,
@@ -525,10 +536,10 @@ class ExportService {
 
           // تکنیک
           g.drawString(
-            tech.techniqueName,
+            technique.name,
             font,
             bounds: Rect.fromLTWH(
-              gx + lvlW * 3 + 2,
+              gx + ratingW * 3 + 2,
               yPos + 2,
               techW - 4,
               rowHeight,
@@ -536,28 +547,39 @@ class ExportService {
             format: rtlFmt,
           );
 
-          // علامت سطح - رسم دایره پر شده
-          if (tech.level == PerformanceLevel.excellent) {
-            final double cx = gx + lvlW * 2 + lvlW / 2;
-            final double cy = yPos + rowHeight / 2;
-            g.drawEllipse(
-              Rect.fromCenter(center: Offset(cx, cy), width: 6, height: 6),
-              brush: PdfSolidBrush(PdfColor(22, 163, 74)),
+          // علامت سطح عملکرد - رسم دایره پر شده
+          if (techniqueEval?.performanceRatingId != null) {
+            final selectedRating = performanceRatings.firstWhere(
+              (r) => r.id == techniqueEval!.performanceRatingId,
+              orElse: () => performanceRatings.first,
             );
-          } else if (tech.level == PerformanceLevel.good) {
-            final double cx = gx + lvlW + lvlW / 2;
-            final double cy = yPos + rowHeight / 2;
-            g.drawEllipse(
-              Rect.fromCenter(center: Offset(cx, cy), width: 6, height: 6),
-              brush: PdfSolidBrush(PdfColor(37, 99, 235)),
+
+            final sortedRatings = List<PerformanceRating>.from(
+              performanceRatings,
+            )..sort((a, b) => b.order.compareTo(a.order));
+
+            final ratingIndex = sortedRatings.indexWhere(
+              (r) => r.id == selectedRating.id,
             );
-          } else if (tech.level == PerformanceLevel.average) {
-            final double cx = gx + lvlW / 2;
-            final double cy = yPos + rowHeight / 2;
-            g.drawEllipse(
-              Rect.fromCenter(center: Offset(cx, cy), width: 6, height: 6),
-              brush: PdfSolidBrush(PdfColor(234, 88, 12)),
-            );
+            if (ratingIndex >= 0 && ratingIndex < 3) {
+              final double cx = gx + ratingW * (2 - ratingIndex) + ratingW / 2;
+              final double cy = yPos + rowHeight / 2;
+
+              // انتخاب رنگ بر اساس ترتیب
+              PdfColor color;
+              if (ratingIndex == 0) {
+                color = PdfColor(22, 163, 74); // سبز برای بهترین
+              } else if (ratingIndex == 1) {
+                color = PdfColor(37, 99, 235); // آبی برای متوسط
+              } else {
+                color = PdfColor(234, 88, 12); // نارنجی برای ضعیف‌تر
+              }
+
+              g.drawEllipse(
+                Rect.fromCenter(center: Offset(cx, cy), width: 6, height: 6),
+                brush: PdfSolidBrush(color),
+              );
+            }
           }
         }
       }
@@ -662,6 +684,7 @@ class ExportService {
 
   Future<String> exportToExcel({
     required ReportCard reportCard,
+    required Sport sport,
     required String outputDirectory,
   }) async {
     try {
@@ -703,6 +726,24 @@ class ExportService {
       headerRange.cellStyle.backColor = '#2196F3';
       headerRange.cellStyle.fontColor = '#FFFFFF';
       headerRange.rowHeight = 35;
+      currentRow += 2;
+
+      // ===== نام رشته ورزشی =====
+      final xlsio.Range sportRange = sheet.getRangeByIndex(
+        currentRow,
+        1,
+        currentRow,
+        16,
+      );
+      sportRange.merge();
+      sportRange.setText('رشته ورزشی: ${sport.name}');
+      sportRange.cellStyle.fontSize = 12;
+      sportRange.cellStyle.bold = true;
+      sportRange.cellStyle.hAlign = xlsio.HAlignType.center;
+      sportRange.cellStyle.vAlign = xlsio.VAlignType.center;
+      sportRange.cellStyle.backColor = '#4CAF50';
+      sportRange.cellStyle.fontColor = '#FFFFFF';
+      sportRange.rowHeight = 25;
       currentRow += 2;
 
       // ===== اطلاعات دانش‌آموز =====
@@ -775,7 +816,6 @@ class ExportService {
       currentRow += 2;
 
       // ===== جدول‌های سطوح =====
-      final sectionNames = ReportCardTemplate.getSectionNames();
       final colors = [
         '#BBDEFB',
         '#C8E6C9',
@@ -786,61 +826,70 @@ class ExportService {
         '#FFF9C4',
       ];
 
-      for (
-        int sectionIndex = 0;
-        sectionIndex < sectionNames.length;
-        sectionIndex++
-      ) {
-        final section = reportCard.sections[sectionNames[sectionIndex]];
-        if (section == null) continue;
-
-        final sectionTitle = ReportCardTemplate.getSectionTitle(
-          section.sectionName,
-        );
-        final bgColor = colors[sectionIndex % colors.length];
+      for (int levelIndex = 0; levelIndex < sport.levels.length; levelIndex++) {
+        final level = sport.levels[levelIndex];
+        final levelEvaluation = reportCard.levelEvaluations?[level.id];
+        final bgColor = colors[levelIndex % colors.length];
 
         // عنوان سطح
-        final xlsio.Range sectionHeader = sheet.getRangeByIndex(
+        final xlsio.Range levelHeader = sheet.getRangeByIndex(
           currentRow,
           1,
           currentRow,
           16,
         );
-        sectionHeader.merge();
-        sectionHeader.setText('${section.sectionName} - $sectionTitle');
-        sectionHeader.cellStyle.bold = true;
-        sectionHeader.cellStyle.fontSize = 11;
-        sectionHeader.cellStyle.hAlign = xlsio.HAlignType.right;
-        sectionHeader.cellStyle.vAlign = xlsio.VAlignType.center;
-        sectionHeader.cellStyle.backColor = bgColor;
-        sectionHeader.rowHeight = 22;
+        levelHeader.merge();
+        levelHeader.setText(level.name);
+        levelHeader.cellStyle.bold = true;
+        levelHeader.cellStyle.fontSize = 11;
+        levelHeader.cellStyle.hAlign = xlsio.HAlignType.right;
+        levelHeader.cellStyle.vAlign = xlsio.VAlignType.center;
+        levelHeader.cellStyle.backColor = bgColor;
+        levelHeader.rowHeight = 22;
         currentRow++;
 
         // هدر جدول - 3 گروه
-        _addExcelTableHeader(sheet, currentRow, 1);
-        _addExcelTableHeader(sheet, currentRow, 6);
-        _addExcelTableHeader(sheet, currentRow, 11);
+        _addExcelTableHeaderNew(sheet, currentRow, 1, sport.performanceRatings);
+        _addExcelTableHeaderNew(sheet, currentRow, 6, sport.performanceRatings);
+        _addExcelTableHeaderNew(
+          sheet,
+          currentRow,
+          11,
+          sport.performanceRatings,
+        );
         sheet.getRangeByIndex(currentRow, 1, currentRow, 16).rowHeight = 18;
         currentRow++;
 
         // داده‌های تکنیک‌ها - 3 ردیف
         for (int row = 0; row < 3; row++) {
           // گروه 1 (تکنیک 0-2)
-          _addExcelTechniqueRow(sheet, currentRow, 1, section.techniques, row);
+          _addExcelTechniqueRowNew(
+            sheet,
+            currentRow,
+            1,
+            level.techniques,
+            levelEvaluation,
+            sport.performanceRatings,
+            row,
+          );
           // گروه 2 (تکنیک 3-5)
-          _addExcelTechniqueRow(
+          _addExcelTechniqueRowNew(
             sheet,
             currentRow,
             6,
-            section.techniques,
+            level.techniques,
+            levelEvaluation,
+            sport.performanceRatings,
             row + 3,
           );
           // گروه 3 (تکنیک 6-8)
-          _addExcelTechniqueRow(
+          _addExcelTechniqueRowNew(
             sheet,
             currentRow,
             11,
-            section.techniques,
+            level.techniques,
+            levelEvaluation,
+            sport.performanceRatings,
             row + 6,
           );
           sheet.getRangeByIndex(currentRow, 1, currentRow, 16).rowHeight = 16;
@@ -943,9 +992,23 @@ class ExportService {
     valueRange.cellStyle.hAlign = xlsio.HAlignType.right;
   }
 
-  void _addExcelTableHeader(xlsio.Worksheet sheet, int row, int startCol) {
-    final headers = ['ردیف', 'تکنیک', 'عالی', 'خوب', 'متوسط'];
-    final widths = [1, 2, 1, 1, 1]; // تعداد ستون برای هر هدر
+  void _addExcelTableHeaderNew(
+    xlsio.Worksheet sheet,
+    int row,
+    int startCol,
+    List<PerformanceRating> performanceRatings,
+  ) {
+    final headers = ['ردیف', 'تکنیک'];
+    final widths = [1, 2]; // تعداد ستون برای هر هدر
+
+    // اضافه کردن نام‌های سطوح عملکرد به ترتیب معکوس (بهترین در سمت راست)
+    final sortedRatings = List<PerformanceRating>.from(performanceRatings)
+      ..sort((a, b) => b.order.compareTo(a.order));
+
+    for (int i = 0; i < 3 && i < sortedRatings.length; i++) {
+      headers.add(sortedRatings[i].name);
+      widths.add(1);
+    }
 
     int col = startCol;
     for (int i = 0; i < headers.length; i++) {
@@ -961,21 +1024,24 @@ class ExportService {
     }
   }
 
-  void _addExcelTechniqueRow(
+  void _addExcelTechniqueRowNew(
     xlsio.Worksheet sheet,
     int row,
     int startCol,
-    List<TechniqueEvaluation> techniques,
+    List<Technique> techniques,
+    LevelEvaluation? levelEvaluation,
+    List<PerformanceRating> performanceRatings,
     int techIndex,
   ) {
     if (techIndex >= techniques.length) return;
 
-    final tech = techniques[techIndex];
+    final technique = techniques[techIndex];
+    final techniqueEval = levelEvaluation?.techniqueEvaluations[technique.id];
     int col = startCol;
 
     // ردیف
     final xlsio.Range numCell = sheet.getRangeByIndex(row, col);
-    numCell.setText(_toPersianNumber(tech.number));
+    numCell.setText(_toPersianNumber(technique.order));
     numCell.cellStyle.hAlign = xlsio.HAlignType.center;
     numCell.cellStyle.fontSize = 9;
     numCell.cellStyle.borders.all.lineStyle = xlsio.LineStyle.thin;
@@ -983,41 +1049,43 @@ class ExportService {
 
     // تکنیک
     final xlsio.Range techCell = sheet.getRangeByIndex(row, col);
-    techCell.setText(tech.techniqueName);
+    techCell.setText(technique.name);
     techCell.cellStyle.hAlign = xlsio.HAlignType.right;
     techCell.cellStyle.fontSize = 9;
     techCell.cellStyle.borders.all.lineStyle = xlsio.LineStyle.thin;
     col++;
 
-    // عالی
-    final xlsio.Range excellentCell = sheet.getRangeByIndex(row, col);
-    excellentCell.setText(tech.level == PerformanceLevel.excellent ? '✓' : '');
-    excellentCell.cellStyle.hAlign = xlsio.HAlignType.center;
-    excellentCell.cellStyle.fontColor = '#16A34A';
-    excellentCell.cellStyle.bold = true;
-    excellentCell.cellStyle.borders.all.lineStyle = xlsio.LineStyle.thin;
-    col++;
+    // سطوح عملکرد به ترتیب معکوس (بهترین در سمت راست)
+    final sortedRatings = List<PerformanceRating>.from(performanceRatings)
+      ..sort((a, b) => b.order.compareTo(a.order));
 
-    // خوب
-    final xlsio.Range goodCell = sheet.getRangeByIndex(row, col);
-    goodCell.setText(tech.level == PerformanceLevel.good ? '✓' : '');
-    goodCell.cellStyle.hAlign = xlsio.HAlignType.center;
-    goodCell.cellStyle.fontColor = '#2563EB';
-    goodCell.cellStyle.bold = true;
-    goodCell.cellStyle.borders.all.lineStyle = xlsio.LineStyle.thin;
-    col++;
+    for (int i = 0; i < 3 && i < sortedRatings.length; i++) {
+      final xlsio.Range ratingCell = sheet.getRangeByIndex(row, col);
+      final isSelected =
+          techniqueEval?.performanceRatingId == sortedRatings[i].id;
+      ratingCell.setText(isSelected ? '✓' : '');
+      ratingCell.cellStyle.hAlign = xlsio.HAlignType.center;
 
-    // متوسط
-    final xlsio.Range averageCell = sheet.getRangeByIndex(row, col);
-    averageCell.setText(tech.level == PerformanceLevel.average ? '✓' : '');
-    averageCell.cellStyle.hAlign = xlsio.HAlignType.center;
-    averageCell.cellStyle.fontColor = '#EA580C';
-    averageCell.cellStyle.bold = true;
-    averageCell.cellStyle.borders.all.lineStyle = xlsio.LineStyle.thin;
+      // انتخاب رنگ بر اساس ترتیب
+      if (isSelected) {
+        if (i == 0) {
+          ratingCell.cellStyle.fontColor = '#16A34A'; // سبز برای بهترین
+        } else if (i == 1) {
+          ratingCell.cellStyle.fontColor = '#2563EB'; // آبی برای متوسط
+        } else {
+          ratingCell.cellStyle.fontColor = '#EA580C'; // نارنجی برای ضعیف‌تر
+        }
+        ratingCell.cellStyle.bold = true;
+      }
+
+      ratingCell.cellStyle.borders.all.lineStyle = xlsio.LineStyle.thin;
+      col++;
+    }
   }
 
   Future<List<String>> batchExport({
     required List<ReportCard> reportCards,
+    required Map<String, Sport> sportsMap,
     required String outputDirectory,
     required ExportFormat format,
     Function(int current, int total)? onProgress,
@@ -1026,13 +1094,23 @@ class ExportService {
 
     for (int i = 0; i < reportCards.length; i++) {
       try {
+        final reportCard = reportCards[i];
+        final sport = sportsMap[reportCard.sportId];
+
+        if (sport == null) {
+          // اگر رشته ورزشی یافت نشد، از رشته پیش‌فرض استفاده کن
+          continue;
+        }
+
         final filePath = format == ExportFormat.pdf
             ? await exportToPDF(
-                reportCard: reportCards[i],
+                reportCard: reportCard,
+                sport: sport,
                 outputDirectory: outputDirectory,
               )
             : await exportToExcel(
-                reportCard: reportCards[i],
+                reportCard: reportCard,
+                sport: sport,
                 outputDirectory: outputDirectory,
               );
 
@@ -1066,11 +1144,15 @@ class ExportService {
     }
   }
 
-  int estimateFileSize(ReportCard reportCard, ExportFormat format) {
+  int estimateFileSize(
+    ReportCard reportCard,
+    Sport sport,
+    ExportFormat format,
+  ) {
     final baseSize = format == ExportFormat.pdf ? 50000 : 20000;
-    final techniqueCount = reportCard.sections.values.fold<int>(
+    final techniqueCount = sport.levels.fold<int>(
       0,
-      (sum, section) => sum + section.techniques.length,
+      (sum, level) => sum + level.techniques.length,
     );
     return baseSize + (techniqueCount * 100);
   }

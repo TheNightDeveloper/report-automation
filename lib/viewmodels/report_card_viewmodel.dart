@@ -1,11 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../repositories/report_card_repository.dart';
-import '../services/report_card_service.dart';
+import '../repositories/sport_repository.dart';
 
 // State class برای مدیریت کارنامه
 class ReportCardState {
   final ReportCard? currentReportCard;
+  final Sport? selectedSport;
+  final List<Sport> availableSports;
   final bool isLoading;
   final bool isSaving;
   final String? errorMessage;
@@ -13,6 +15,8 @@ class ReportCardState {
 
   ReportCardState({
     this.currentReportCard,
+    this.selectedSport,
+    this.availableSports = const [],
     this.isLoading = false,
     this.isSaving = false,
     this.errorMessage,
@@ -21,6 +25,8 @@ class ReportCardState {
 
   ReportCardState copyWith({
     ReportCard? currentReportCard,
+    Sport? selectedSport,
+    List<Sport>? availableSports,
     bool? isLoading,
     bool? isSaving,
     String? errorMessage,
@@ -28,6 +34,8 @@ class ReportCardState {
   }) {
     return ReportCardState(
       currentReportCard: currentReportCard ?? this.currentReportCard,
+      selectedSport: selectedSport ?? this.selectedSport,
+      availableSports: availableSports ?? this.availableSports,
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
       errorMessage: errorMessage,
@@ -36,47 +44,182 @@ class ReportCardState {
   }
 
   double get completionPercentage {
-    if (currentReportCard == null) return 0.0;
-    final service = ReportCardService();
-    return service.calculateCompletionPercentage(currentReportCard!);
+    if (currentReportCard == null || selectedSport == null) return 0.0;
+    return _calculateCompletionPercentage();
   }
 
-  bool get isComplete {
-    if (currentReportCard == null) return false;
-    final service = ReportCardService();
-    return service.isReportCardComplete(currentReportCard!);
+  double _calculateCompletionPercentage() {
+    if (currentReportCard?.levelEvaluations == null) return 0.0;
+
+    int totalTechniques = 0;
+    int evaluatedTechniques = 0;
+
+    for (final level in selectedSport!.levels) {
+      totalTechniques += level.techniques.length;
+      final levelEval = currentReportCard!.levelEvaluations?[level.id];
+      if (levelEval != null) {
+        for (final tech in level.techniques) {
+          final techEval = levelEval.techniqueEvaluations[tech.id];
+          if (techEval?.performanceRatingId != null) {
+            evaluatedTechniques++;
+          }
+        }
+      }
+    }
+
+    if (totalTechniques == 0) return 0.0;
+    return (evaluatedTechniques / totalTechniques) * 100;
   }
+
+  bool get isComplete => completionPercentage >= 100;
 }
 
 // Notifier برای مدیریت کارنامه
 class ReportCardNotifier extends Notifier<ReportCardState> {
   late final ReportCardRepository _repository;
-  late final ReportCardService _service;
+  late final SportRepository _sportRepository;
 
   @override
   ReportCardState build() {
     _repository = ReportCardRepository();
-    _service = ReportCardService();
+    _sportRepository = SportRepository();
     return ReportCardState();
   }
 
-  // بارگذاری کارنامه برای دانش‌آموز
-  Future<void> loadReportCard(String studentId, String studentName) async {
+  // بارگذاری لیست رشته‌های ورزشی
+  Future<void> loadAvailableSports() async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final sports = await _sportRepository.getAllSports();
+      sports.sort((a, b) {
+        if (a.isDefault && !b.isDefault) return -1;
+        if (!a.isDefault && b.isDefault) return 1;
+        return a.name.compareTo(b.name);
+      });
+      state = state.copyWith(availableSports: sports, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'خطا در بارگذاری رشته‌های ورزشی: ${e.toString()}',
+      );
+    }
+  }
+
+  // انتخاب رشته ورزشی
+  void selectSport(Sport sport) {
+    state = state.copyWith(selectedSport: sport);
+  }
+
+  // بارگذاری کارنامه برای دانش‌آموز با رشته ورزشی
+  Future<void> loadReportCard(
+    String studentId,
+    String studentName, {
+    String? sportId,
+  }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       ReportCard? reportCard = await _repository.loadReportCard(studentId);
 
-      if (reportCard == null) {
-        reportCard = _service.createEmptyReportCard(studentId, studentName);
+      // اگر کارنامه موجود است و sportId دارد
+      if (reportCard != null && reportCard.sportId != null) {
+        final sport = await _sportRepository.getSport(reportCard.sportId!);
+        if (sport != null) {
+          state = state.copyWith(
+            currentReportCard: reportCard,
+            selectedSport: sport,
+            isLoading: false,
+          );
+          return;
+        }
       }
 
-      state = state.copyWith(currentReportCard: reportCard, isLoading: false);
+      // اگر sportId مشخص شده
+      if (sportId != null) {
+        final sport = await _sportRepository.getSport(sportId);
+        if (sport != null) {
+          if (reportCard == null) {
+            reportCard = _createEmptyReportCard(studentId, studentName, sport);
+          } else {
+            reportCard = reportCard.copyWith(sportId: sportId);
+          }
+          state = state.copyWith(
+            currentReportCard: reportCard,
+            selectedSport: sport,
+            isLoading: false,
+          );
+          return;
+        }
+      }
+
+      // استفاده از رشته پیش‌فرض
+      final defaultSport = await _sportRepository.getDefaultSport();
+      if (defaultSport != null) {
+        reportCard ??= _createEmptyReportCard(
+          studentId,
+          studentName,
+          defaultSport,
+        );
+        state = state.copyWith(
+          currentReportCard: reportCard,
+          selectedSport: defaultSport,
+          isLoading: false,
+        );
+      } else {
+        // اگر هیچ رشته‌ای وجود ندارد
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'هیچ رشته ورزشی تعریف نشده است',
+        );
+      }
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'خطا در بارگذاری کارنامه: ${e.toString()}',
       );
     }
+  }
+
+  // ایجاد کارنامه خالی با ساختار جدید
+  ReportCard _createEmptyReportCard(
+    String studentId,
+    String studentName,
+    Sport sport,
+  ) {
+    final levelEvaluations = <String, LevelEvaluation>{};
+
+    for (final level in sport.levels) {
+      final techniqueEvaluations = <String, TechniqueEvaluation>{};
+      for (final technique in level.techniques) {
+        techniqueEvaluations[technique.id] = TechniqueEvaluation(
+          techniqueId: technique.id,
+          performanceRatingId: null,
+        );
+      }
+      levelEvaluations[level.id] = LevelEvaluation(
+        levelId: level.id,
+        techniqueEvaluations: techniqueEvaluations,
+      );
+    }
+
+    return ReportCard(
+      studentId: studentId,
+      studentInfo: StudentInfo(
+        name: studentName,
+        grade: null,
+        level: null,
+        school: null,
+        headCoach: null,
+      ),
+      attendanceInfo: AttendanceInfo(
+        totalSessions: 0,
+        attendedSessions: 0,
+        performanceLevel: null,
+      ),
+      sportId: sport.id,
+      levelEvaluations: levelEvaluations,
+      comments: null,
+      signatureImagePath: null,
+    );
   }
 
   // ذخیره کارنامه
@@ -150,16 +293,59 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
     }
   }
 
-  // به‌روزرسانی ارزیابی تکنیک
+  // به‌روزرسانی ارزیابی تکنیک - ساختار جدید
+  void updateTechniqueEvaluationNew({
+    required String levelId,
+    required String techniqueId,
+    required String? performanceRatingId,
+  }) {
+    if (state.currentReportCard == null) return;
+
+    try {
+      final levelEvaluations = Map<String, LevelEvaluation>.from(
+        state.currentReportCard!.levelEvaluations ?? {},
+      );
+
+      var levelEval = levelEvaluations[levelId];
+      levelEval ??= LevelEvaluation(levelId: levelId, techniqueEvaluations: {});
+
+      final techniqueEvaluations = Map<String, TechniqueEvaluation>.from(
+        levelEval.techniqueEvaluations,
+      );
+
+      techniqueEvaluations[techniqueId] = TechniqueEvaluation(
+        techniqueId: techniqueId,
+        performanceRatingId: performanceRatingId,
+      );
+
+      levelEvaluations[levelId] = levelEval.copyWith(
+        techniqueEvaluations: techniqueEvaluations,
+      );
+
+      final updatedReportCard = state.currentReportCard!.copyWith(
+        levelEvaluations: levelEvaluations,
+      );
+
+      state = state.copyWith(currentReportCard: updatedReportCard);
+      _autoSave();
+    } catch (e) {
+      state = state.copyWith(
+        errorMessage: 'خطا در به‌روزرسانی ارزیابی تکنیک: ${e.toString()}',
+      );
+    }
+  }
+
+  // به‌روزرسانی ارزیابی تکنیک - ساختار قدیمی (برای سازگاری)
   void updateTechniqueEvaluation({
     required String sectionName,
     required int techniqueNumber,
     required PerformanceLevel? performanceLevel,
   }) {
     if (state.currentReportCard == null) return;
+    if (state.currentReportCard!.sections == null) return;
 
     try {
-      final section = state.currentReportCard!.sections[sectionName];
+      final section = state.currentReportCard!.sections![sectionName];
       if (section == null) return;
 
       final updatedTechniques = section.techniques.map((tech) {
@@ -171,7 +357,7 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
 
       final updatedSection = section.copyWith(techniques: updatedTechniques);
       final updatedSections = Map<String, SectionEvaluation>.from(
-        state.currentReportCard!.sections,
+        state.currentReportCard!.sections!,
       );
       updatedSections[sectionName] = updatedSection;
 
@@ -224,7 +410,26 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
 
   // پاک کردن کارنامه فعلی
   void clearCurrentReportCard() {
-    state = ReportCardState();
+    state = ReportCardState(availableSports: state.availableSports);
+  }
+
+  // دریافت ارزیابی یک تکنیک
+  String? getTechniqueRating(String levelId, String techniqueId) {
+    final levelEval = state.currentReportCard?.levelEvaluations?[levelId];
+    if (levelEval == null) return null;
+    return levelEval.techniqueEvaluations[techniqueId]?.performanceRatingId;
+  }
+
+  // دریافت نام سطح عملکرد
+  String? getPerformanceRatingName(String? ratingId) {
+    if (ratingId == null || state.selectedSport == null) return null;
+    try {
+      return state.selectedSport!.performanceRatings
+          .firstWhere((r) => r.id == ratingId)
+          .name;
+    } catch (e) {
+      return null;
+    }
   }
 }
 
