@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 import '../viewmodels/sport_viewmodel.dart';
 import '../viewmodels/student_viewmodel.dart';
+import '../viewmodels/report_card_viewmodel.dart';
 import '../models/models.dart';
 import 'student_list_screen.dart';
 import 'report_card_screen.dart';
@@ -46,7 +47,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       onManageSports: () => _onItemTapped(4),
       onStudentSelected: () => _onItemTapped(1),
     ),
-    StudentListScreen(onStudentSelected: () => _onItemTapped(2)),
+    StudentListScreen(
+      onStudentSelected: () => _onItemTapped(2),
+      selectedSportId: _selectedSport?.id,
+    ),
     ReportCardScreen(key: ValueKey(_selectedSport?.id)),
     const ExportScreen(),
     const SportsListScreen(),
@@ -87,10 +91,28 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   ];
 
   void _onSportSelected(Sport sport) {
+    final previousSport = _selectedSport;
     setState(() {
       _selectedSport = sport;
     });
     ref.read(sportProvider.notifier).selectSport(sport);
+
+    // اگر رشته واقعاً عوض شده و دانش‌آموزی انتخاب شده، کارنامه رو با رشته جدید reload کن
+    if (previousSport?.id != sport.id) {
+      final studentState = ref.read(studentProvider);
+      if (studentState.selectedStudent != null) {
+        // کمی تاخیر برای اطمینان از به‌روزرسانی UI
+        Future.delayed(const Duration(milliseconds: 100), () {
+          ref
+              .read(reportCardProvider.notifier)
+              .loadReportCard(
+                studentState.selectedStudent!.id,
+                studentState.selectedStudent!.name,
+                sportId: sport.id,
+              );
+        });
+      }
+    }
   }
 
   @override

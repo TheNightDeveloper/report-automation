@@ -9,8 +9,13 @@ enum ImportAction { append, replace }
 
 class StudentListScreen extends ConsumerStatefulWidget {
   final VoidCallback? onStudentSelected;
+  final String? selectedSportId;
 
-  const StudentListScreen({super.key, this.onStudentSelected});
+  const StudentListScreen({
+    super.key,
+    this.onStudentSelected,
+    this.selectedSportId,
+  });
 
   @override
   ConsumerState<StudentListScreen> createState() => _StudentListScreenState();
@@ -318,10 +323,14 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     // انتخاب دانش‌آموز
     ref.read(studentProvider.notifier).selectStudent(index);
 
-    // بارگذاری کارنامه
+    // بارگذاری کارنامه با رشته ورزشی انتخاب شده
     ref
         .read(reportCardProvider.notifier)
-        .loadReportCard(studentId, studentName);
+        .loadReportCard(
+          studentId,
+          studentName,
+          sportId: widget.selectedSportId,
+        );
 
     // اطلاع به parent برای تغییر تب (اگر callback داده شده)
     if (widget.onStudentSelected != null) {

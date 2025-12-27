@@ -18,6 +18,7 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  bool _isNewSportSaved = false;
 
   bool get isEditMode => widget.sport != null;
 
@@ -26,15 +27,21 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
 
+    // گوش دادن به تغییر تب برای به‌روزرسانی UI
+    _tabController.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+
     if (isEditMode) {
       _nameController.text = widget.sport!.name;
       _descriptionController.text = widget.sport!.description ?? '';
-      // بارگذاری رشته برای ویرایش
+      _isNewSportSaved = true;
       Future.microtask(() {
         ref.read(sportProvider.notifier).selectSport(widget.sport!);
       });
     } else {
-      // ایجاد رشته جدید با سطوح عملکرد پیش‌فرض
       Future.microtask(() {
         ref.read(sportProvider.notifier).createNewSport();
       });
@@ -52,31 +59,65 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(sportProvider);
+    final theme = Theme.of(context);
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: Colors.grey.shade50,
         appBar: AppBar(
-          title: Text(isEditMode ? 'ویرایش رشته ورزشی' : 'رشته ورزشی جدید'),
-          backgroundColor: Colors.blue,
+          elevation: 0,
+          title: Text(
+            isEditMode ? 'ویرایش رشته ورزشی' : 'رشته ورزشی جدید',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: theme.primaryColor,
           foregroundColor: Colors.white,
           actions: [
-            IconButton(
-              icon: const Icon(Icons.save),
-              onPressed: state.isSaving ? null : _saveSport,
-              tooltip: 'ذخیره',
-            ),
+            // فقط در تب اطلاعات پایه دکمه ذخیره نمایش بده
+            if (_tabController.index == 0)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: TextButton.icon(
+                  onPressed: state.isSaving ? null : _saveSport,
+                  icon: state.isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.check, color: Colors.white),
+                  label: Text(
+                    'ذخیره',
+                    style: TextStyle(
+                      color: state.isSaving ? Colors.white60 : Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
           ],
-          bottom: TabBar(
-            controller: _tabController,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            indicatorColor: Colors.white,
-            tabs: const [
-              Tab(text: 'اطلاعات پایه'),
-              Tab(text: 'سطوح'),
-              Tab(text: 'سطوح عملکرد'),
-            ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(48),
+            child: Container(
+              color: theme.primaryColor,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                indicatorColor: Colors.white,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+                tabs: const [
+                  Tab(text: 'اطلاعات پایه'),
+                  Tab(text: 'سطوح'),
+                  Tab(text: 'سطوح عملکرد'),
+                ],
+              ),
+            ),
           ),
         ),
         body: state.isLoading
@@ -95,69 +136,148 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
 
   Widget _buildBasicInfoTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'نام رشته ورزشی *',
-                hintText: 'مثال: شنا، فوتبال، بسکتبال',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.sports),
+            // کارت اطلاعات اصلی
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.grey.shade200),
               ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'نام رشته الزامی است';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'توضیحات',
-                hintText: 'توضیحات اختیاری درباره رشته',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.description),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.sports,
+                            color: Colors.blue.shade700,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'مشخصات رشته',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: InputDecoration(
+                        labelText: 'نام رشته ورزشی',
+                        hintText: 'مثال: شنا، فوتبال، بسکتبال',
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.blue.shade400,
+                            width: 2,
+                          ),
+                        ),
+                        prefixIcon: const Icon(Icons.edit_outlined),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'نام رشته الزامی است';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _descriptionController,
+                      decoration: InputDecoration(
+                        labelText: 'توضیحات (اختیاری)',
+                        hintText: 'توضیحات درباره این رشته ورزشی',
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.blue.shade400,
+                            width: 2,
+                          ),
+                        ),
+                        prefixIcon: const Icon(Icons.description_outlined),
+                        alignLabelWithHint: true,
+                      ),
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
               ),
-              maxLines: 3,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+            // کارت راهنما
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade50, Colors.blue.shade100],
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                ),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700),
+                      Icon(
+                        Icons.lightbulb_outline,
+                        color: Colors.blue.shade700,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'راهنما',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.blue.shade700,
+                          fontSize: 15,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '• بعد از ذخیره اطلاعات پایه، می‌توانید سطوح و تکنیک‌ها را اضافه کنید\n'
-                    '• هر رشته باید حداقل یک سطح و یک تکنیک داشته باشد\n'
-                    '• سطوح عملکرد برای ارزیابی تکنیک‌ها استفاده می‌شوند',
-                    style: TextStyle(fontSize: 13),
-                  ),
+                  const SizedBox(height: 12),
+                  _buildGuideItem('ابتدا نام رشته را وارد و ذخیره کنید'),
+                  _buildGuideItem('سپس سطوح و تکنیک‌ها را اضافه کنید'),
+                  _buildGuideItem('سطوح عملکرد برای ارزیابی استفاده می‌شوند'),
                 ],
               ),
             ),
@@ -167,35 +287,48 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
     );
   }
 
+  Widget _buildGuideItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.check_circle, size: 18, color: Colors.blue.shade600),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(color: Colors.blue.shade800, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildLevelsTab(SportState state) {
-    if (state.selectedSport == null) {
-      return const Center(child: Text('ابتدا اطلاعات پایه را ذخیره کنید'));
+    final canEdit = _isNewSportSaved || isEditMode;
+
+    if (!canEdit) {
+      return _buildLockedTab(
+        icon: Icons.layers_outlined,
+        title: 'ابتدا اطلاعات پایه را ذخیره کنید',
+        subtitle: 'برای افزودن سطوح، ابتدا نام رشته را وارد و ذخیره کنید',
+      );
     }
 
-    final levels = state.selectedSport!.levels;
+    final levels = state.selectedSport?.levels ?? [];
 
     return Column(
       children: [
         Expanded(
           child: levels.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.layers, size: 64, color: Colors.grey),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'هیچ سطحی تعریف نشده است',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _addLevel,
-                        icon: const Icon(Icons.add),
-                        label: const Text('افزودن سطح اول'),
-                      ),
-                    ],
-                  ),
+              ? _buildEmptyState(
+                  icon: Icons.layers_outlined,
+                  title: 'هیچ سطحی تعریف نشده',
+                  subtitle: 'سطوح مختلف رشته ورزشی را اضافه کنید',
+                  buttonText: 'افزودن اولین سطح',
+                  onPressed: _addLevel,
                 )
               : ReorderableListView.builder(
                   padding: const EdgeInsets.all(16),
@@ -215,30 +348,121 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
                   },
                 ),
         ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 4,
-                offset: const Offset(0, -2),
+        if (levels.isNotEmpty) _buildBottomButton('افزودن سطح جدید', _addLevel),
+      ],
+    );
+  }
+
+  Widget _buildLockedTab({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                shape: BoxShape.circle,
               ),
-            ],
-          ),
-          child: SafeArea(
-            child: ElevatedButton.icon(
-              onPressed: _addLevel,
-              icon: const Icon(Icons.add),
-              label: const Text('افزودن سطح جدید'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
+              child: Icon(icon, size: 48, color: Colors.orange.shade400),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: () => _tabController.animateTo(0),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('رفتن به اطلاعات پایه'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String buttonText,
+    required VoidCallback onPressed,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 48, color: Colors.grey.shade400),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(Icons.add),
+              label: Text(buttonText),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -246,146 +470,212 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
     return Card(
       key: key,
       margin: const EdgeInsets.only(bottom: 12),
-      child: ExpansionTile(
-        leading: const Icon(Icons.drag_handle),
-        title: Text(
-          level.name,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text('${level.techniques.length} تکنیک'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.drag_handle,
+              color: Colors.blue.shade400,
+              size: 20,
+            ),
+          ),
+          title: Text(
+            level.name,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          ),
+          subtitle: Text(
+            '${level.techniques.length} تکنیک',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildIconButton(
+                Icons.edit_outlined,
+                Colors.blue,
+                () => _editLevel(level),
+              ),
+              const SizedBox(width: 4),
+              _buildIconButton(
+                Icons.delete_outline,
+                Colors.red,
+                () => _deleteLevel(level),
+              ),
+            ],
+          ),
           children: [
-            IconButton(
-              icon: const Icon(Icons.edit, size: 20),
-              onPressed: () => _editLevel(level),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-              onPressed: () => _deleteLevel(level),
-            ),
-          ],
-        ),
-        children: [
-          if (level.techniques.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(16),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+              ),
               child: Column(
                 children: [
-                  const Text(
-                    'هیچ تکنیکی تعریف نشده است',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: () => _addTechnique(level),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('افزودن تکنیک'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 40),
+                  if (level.techniques.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.sports_gymnastics,
+                            size: 40,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'هیچ تکنیکی تعریف نشده',
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ...level.techniques.map((technique) {
+                      return ListTile(
+                        dense: true,
+                        leading: CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Colors.blue.shade100,
+                          child: Text(
+                            '${technique.order}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          technique.name,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildSmallIconButton(
+                              Icons.edit_outlined,
+                              () => _editTechnique(level, technique),
+                            ),
+                            _buildSmallIconButton(
+                              Icons.delete_outline,
+                              () => _deleteTechnique(level, technique),
+                              color: Colors.red,
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: OutlinedButton.icon(
+                      onPressed: () => _addTechnique(level),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('افزودن تکنیک'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 40),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
-            )
-          else
-            ...level.techniques.map((technique) {
-              return ListTile(
-                dense: true,
-                leading: CircleAvatar(
-                  radius: 12,
-                  child: Text(
-                    '${technique.order}',
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                ),
-                title: Text(technique.name),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 18),
-                      onPressed: () => _editTechnique(level, technique),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete,
-                        size: 18,
-                        color: Colors.red,
-                      ),
-                      onPressed: () => _deleteTechnique(level, technique),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: ElevatedButton.icon(
-              onPressed: () => _addTechnique(level),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('افزودن تکنیک'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 40),
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
+  Widget _buildIconButton(IconData icon, Color color, VoidCallback onPressed) {
+    return Material(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, size: 18, color: color),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSmallIconButton(
+    IconData icon,
+    VoidCallback onPressed, {
+    Color? color,
+  }) {
+    return IconButton(
+      icon: Icon(icon, size: 18, color: color ?? Colors.grey.shade600),
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+    );
+  }
+
   Widget _buildPerformanceRatingsTab(SportState state) {
-    if (state.selectedSport == null) {
-      return const Center(child: Text('ابتدا اطلاعات پایه را ذخیره کنید'));
+    final canEdit = _isNewSportSaved || isEditMode;
+
+    if (!canEdit) {
+      return _buildLockedTab(
+        icon: Icons.star_outline,
+        title: 'ابتدا اطلاعات پایه را ذخیره کنید',
+        subtitle: 'برای مدیریت سطوح عملکرد، ابتدا رشته را ذخیره کنید',
+      );
     }
 
-    final ratings = state.selectedSport!.performanceRatings;
+    final ratings = state.selectedSport?.performanceRatings ?? [];
 
     return Column(
       children: [
         Expanded(
-          child: ReorderableListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: ratings.length,
-            onReorder: (oldIndex, newIndex) {
-              ref
-                  .read(sportProvider.notifier)
-                  .reorderPerformanceRatings(oldIndex, newIndex);
-            },
-            itemBuilder: (context, index) {
-              final rating = ratings[index];
-              return _buildPerformanceRatingCard(
-                rating,
-                index,
-                key: ValueKey(rating.id),
-              );
-            },
-          ),
+          child: ratings.isEmpty
+              ? _buildEmptyState(
+                  icon: Icons.star_outline,
+                  title: 'هیچ سطح عملکردی تعریف نشده',
+                  subtitle: 'سطوح عملکرد برای ارزیابی تکنیک‌ها استفاده می‌شوند',
+                  buttonText: 'افزودن سطح عملکرد',
+                  onPressed: _addPerformanceRating,
+                )
+              : ReorderableListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: ratings.length,
+                  onReorder: (oldIndex, newIndex) {
+                    ref
+                        .read(sportProvider.notifier)
+                        .reorderPerformanceRatings(oldIndex, newIndex);
+                  },
+                  itemBuilder: (context, index) {
+                    final rating = ratings[index];
+                    return _buildPerformanceRatingCard(
+                      rating,
+                      index,
+                      key: ValueKey(rating.id),
+                    );
+                  },
+                ),
         ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 4,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            child: ElevatedButton.icon(
-              onPressed: _addPerformanceRating,
-              icon: const Icon(Icons.add),
-              label: const Text('افزودن سطح عملکرد جدید'),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 48),
-              ),
-            ),
-          ),
-        ),
+        if (ratings.isNotEmpty)
+          _buildBottomButton('افزودن سطح عملکرد جدید', _addPerformanceRating),
       ],
     );
   }
@@ -395,28 +685,97 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
     int index, {
     required Key key,
   }) {
+    final color = _parseColor(rating.color);
+
     return Card(
       key: key,
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
       child: ListTile(
-        leading: const Icon(Icons.drag_handle),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(Icons.drag_handle, color: color, size: 20),
+        ),
         title: Text(
           rating.name,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        subtitle: Text('ترتیب: ${rating.order}'),
+        subtitle: Row(
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'ترتیب: ${rating.order}',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            ),
+          ],
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
-              icon: const Icon(Icons.edit, size: 20),
-              onPressed: () => _editPerformanceRating(rating),
+            _buildIconButton(
+              Icons.edit_outlined,
+              Colors.blue,
+              () => _editPerformanceRating(rating),
             ),
-            IconButton(
-              icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-              onPressed: () => _deletePerformanceRating(rating),
+            const SizedBox(width: 4),
+            _buildIconButton(
+              Icons.delete_outline,
+              Colors.red,
+              () => _deletePerformanceRating(rating),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Color _parseColor(String? colorHex) {
+    if (colorHex == null || colorHex.isEmpty) return Colors.grey;
+    try {
+      return Color(int.parse(colorHex.replaceFirst('#', '0xFF')));
+    } catch (e) {
+      return Colors.grey;
+    }
+  }
+
+  Widget _buildBottomButton(String text, VoidCallback onPressed) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: ElevatedButton.icon(
+          onPressed: onPressed,
+          icon: const Icon(Icons.add),
+          label: Text(text),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         ),
       ),
     );
@@ -425,21 +784,45 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
   Future<void> _saveSport() async {
     final formState = _formKey.currentState;
     if (formState == null || !formState.validate()) {
-      return;
+      // validation دستی
+      final name = _nameController.text.trim();
+      if (name.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.white),
+                SizedBox(width: 8),
+                Text('نام رشته الزامی است'),
+              ],
+            ),
+            backgroundColor: Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+        return;
+      }
     }
 
     final name = _nameController.text.trim();
     final description = _descriptionController.text.trim();
 
-    if (isEditMode) {
-      await ref
+    bool success;
+    // اگر در حالت ویرایش هستیم یا قبلاً ذخیره شده، update کن
+    if (isEditMode || _isNewSportSaved) {
+      success = await ref
           .read(sportProvider.notifier)
           .updateSportBasicInfo(
             name: name,
             description: description.isEmpty ? null : description,
           );
     } else {
-      await ref
+      // فقط برای اولین بار create کن
+      success = await ref
           .read(sportProvider.notifier)
           .createSport(
             name: name,
@@ -449,22 +832,46 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
 
     if (mounted) {
       final state = ref.read(sportProvider);
-      if (state.successMessage != null) {
+      if (success && state.successMessage != null) {
+        setState(() {
+          _isNewSportSaved = true;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(state.successMessage!),
-            backgroundColor: Colors.green,
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(state.successMessage!),
+              ],
+            ),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
         if (!isEditMode) {
-          // بعد از ایجاد موفق، به تب سطوح برو
           _tabController.animateTo(1);
         }
       } else if (state.errorMessage != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(state.errorMessage!),
-            backgroundColor: Colors.red,
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text(state.errorMessage!)),
+              ],
+            ),
+            backgroundColor: Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
         );
       }
@@ -472,212 +879,82 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
   }
 
   Future<void> _addLevel() async {
-    final nameController = TextEditingController();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('افزودن سطح جدید'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'نام سطح',
-              hintText: 'مثال: سطح 1، مبتدی، پیشرفته',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('لغو'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('افزودن'),
-            ),
-          ],
-        ),
-      ),
+    final result = await _showInputDialog(
+      title: 'افزودن سطح جدید',
+      hint: 'مثال: سطح 1، مبتدی، پیشرفته',
+      label: 'نام سطح',
+      icon: Icons.layers_outlined,
     );
 
-    if (result == true && nameController.text.trim().isNotEmpty) {
-      await ref
-          .read(sportProvider.notifier)
-          .addLevel(nameController.text.trim());
+    if (result != null && result.isNotEmpty) {
+      await ref.read(sportProvider.notifier).addLevel(result);
       _showMessage();
     }
   }
 
   Future<void> _editLevel(Level level) async {
-    final nameController = TextEditingController(text: level.name);
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('ویرایش سطح'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'نام سطح',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('لغو'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('ذخیره'),
-            ),
-          ],
-        ),
-      ),
+    final result = await _showInputDialog(
+      title: 'ویرایش سطح',
+      label: 'نام سطح',
+      initialValue: level.name,
+      icon: Icons.edit_outlined,
     );
 
-    if (result == true && nameController.text.trim().isNotEmpty) {
-      await ref
-          .read(sportProvider.notifier)
-          .updateLevel(level.id, nameController.text.trim());
+    if (result != null && result.isNotEmpty) {
+      await ref.read(sportProvider.notifier).updateLevel(level.id, result);
       _showMessage();
     }
   }
 
   Future<void> _deleteLevel(Level level) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('تأیید حذف'),
-          content: Text('آیا از حذف سطح "${level.name}" اطمینان دارید؟'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('لغو'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('حذف'),
-            ),
-          ],
-        ),
-      ),
+    final confirmed = await _showDeleteConfirmDialog(
+      'حذف سطح',
+      'آیا از حذف سطح "${level.name}" و تمام تکنیک‌های آن اطمینان دارید؟',
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       await ref.read(sportProvider.notifier).deleteLevel(level.id);
       _showMessage();
     }
   }
 
   Future<void> _addTechnique(Level level) async {
-    final nameController = TextEditingController();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('افزودن تکنیک جدید'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'نام تکنیک',
-              hintText: 'مثال: شنای آزاد، ضربه پا',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('لغو'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('افزودن'),
-            ),
-          ],
-        ),
-      ),
+    final result = await _showInputDialog(
+      title: 'افزودن تکنیک جدید',
+      hint: 'مثال: شنای آزاد، ضربه پا',
+      label: 'نام تکنیک',
+      icon: Icons.sports_gymnastics,
     );
 
-    if (result == true && nameController.text.trim().isNotEmpty) {
-      await ref
-          .read(sportProvider.notifier)
-          .addTechnique(level.id, nameController.text.trim());
+    if (result != null && result.isNotEmpty) {
+      await ref.read(sportProvider.notifier).addTechnique(level.id, result);
       _showMessage();
     }
   }
 
   Future<void> _editTechnique(Level level, Technique technique) async {
-    final nameController = TextEditingController(text: technique.name);
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('ویرایش تکنیک'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'نام تکنیک',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('لغو'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('ذخیره'),
-            ),
-          ],
-        ),
-      ),
+    final result = await _showInputDialog(
+      title: 'ویرایش تکنیک',
+      label: 'نام تکنیک',
+      initialValue: technique.name,
+      icon: Icons.edit_outlined,
     );
 
-    if (result == true && nameController.text.trim().isNotEmpty) {
+    if (result != null && result.isNotEmpty) {
       await ref
           .read(sportProvider.notifier)
-          .updateTechnique(level.id, technique.id, nameController.text.trim());
+          .updateTechnique(level.id, technique.id, result);
       _showMessage();
     }
   }
 
   Future<void> _deleteTechnique(Level level, Technique technique) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('تأیید حذف'),
-          content: Text('آیا از حذف تکنیک "${technique.name}" اطمینان دارید؟'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('لغو'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('حذف'),
-            ),
-          ],
-        ),
-      ),
+    final confirmed = await _showDeleteConfirmDialog(
+      'حذف تکنیک',
+      'آیا از حذف تکنیک "${technique.name}" اطمینان دارید؟',
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       await ref
           .read(sportProvider.notifier)
           .deleteTechnique(level.id, technique.id);
@@ -686,111 +963,177 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
   }
 
   Future<void> _addPerformanceRating() async {
-    final nameController = TextEditingController();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('افزودن سطح عملکرد جدید'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'نام سطح عملکرد',
-              hintText: 'مثال: عالی، خوب، متوسط',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('لغو'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('افزودن'),
-            ),
-          ],
-        ),
-      ),
+    final result = await _showInputDialog(
+      title: 'افزودن سطح عملکرد',
+      hint: 'مثال: عالی، خوب، متوسط',
+      label: 'نام سطح عملکرد',
+      icon: Icons.star_outline,
     );
 
-    if (result == true && nameController.text.trim().isNotEmpty) {
-      await ref
-          .read(sportProvider.notifier)
-          .addPerformanceRating(nameController.text.trim());
+    if (result != null && result.isNotEmpty) {
+      await ref.read(sportProvider.notifier).addPerformanceRating(result);
       _showMessage();
     }
   }
 
   Future<void> _editPerformanceRating(PerformanceRating rating) async {
-    final nameController = TextEditingController(text: rating.name);
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: const Text('ویرایش سطح عملکرد'),
-          content: TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'نام سطح عملکرد',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('لغو'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('ذخیره'),
-            ),
-          ],
-        ),
-      ),
+    final result = await _showInputDialog(
+      title: 'ویرایش سطح عملکرد',
+      label: 'نام سطح عملکرد',
+      initialValue: rating.name,
+      icon: Icons.edit_outlined,
     );
 
-    if (result == true && nameController.text.trim().isNotEmpty) {
+    if (result != null && result.isNotEmpty) {
       await ref
           .read(sportProvider.notifier)
-          .updatePerformanceRating(rating.id, nameController.text.trim());
+          .updatePerformanceRating(rating.id, result);
       _showMessage();
     }
   }
 
   Future<void> _deletePerformanceRating(PerformanceRating rating) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await _showDeleteConfirmDialog(
+      'حذف سطح عملکرد',
+      'آیا از حذف سطح عملکرد "${rating.name}" اطمینان دارید؟',
+    );
+
+    if (confirmed) {
+      await ref.read(sportProvider.notifier).deletePerformanceRating(rating.id);
+      _showMessage();
+    }
+  }
+
+  Future<String?> _showInputDialog({
+    required String title,
+    required String label,
+    String? hint,
+    String? initialValue,
+    required IconData icon,
+  }) async {
+    final controller = TextEditingController(text: initialValue);
+
+    return showDialog<String>(
       context: context,
       builder: (context) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          title: const Text('تأیید حذف'),
-          content: Text(
-            'آیا از حذف سطح عملکرد "${rating.name}" اطمینان دارید؟',
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: Colors.blue.shade700, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Text(title, style: const TextStyle(fontSize: 18)),
+            ],
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: label,
+              hintText: hint,
+              filled: true,
+              fillColor: Colors.grey.shade50,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+              ),
+            ),
+            onSubmitted: (value) {
+              if (value.trim().isNotEmpty) {
+                Navigator.pop(context, value.trim());
+              }
+            },
           ),
           actions: [
             TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('لغو', style: TextStyle(color: Colors.grey.shade600)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.trim().isNotEmpty) {
+                  Navigator.pop(context, controller.text.trim());
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(initialValue != null ? 'ذخیره' : 'افزودن'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _showDeleteConfirmDialog(String title, String message) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.delete_outline,
+                  color: Colors.red.shade700,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(title, style: const TextStyle(fontSize: 18)),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('لغو'),
+              child: Text('لغو', style: TextStyle(color: Colors.grey.shade600)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
               child: const Text('حذف'),
             ),
           ],
         ),
       ),
     );
-
-    if (confirmed == true) {
-      await ref.read(sportProvider.notifier).deletePerformanceRating(rating.id);
-      _showMessage();
-    }
+    return result ?? false;
   }
 
   void _showMessage() {
@@ -799,15 +1142,37 @@ class _SportFormScreenState extends ConsumerState<SportFormScreen>
     if (state.successMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(state.successMessage!),
-          backgroundColor: Colors.green,
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 8),
+              Text(state.successMessage!),
+            ],
+          ),
+          backgroundColor: Colors.green.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.all(16),
         ),
       );
     } else if (state.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(state.errorMessage!),
-          backgroundColor: Colors.red,
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(child: Text(state.errorMessage!)),
+            ],
+          ),
+          backgroundColor: Colors.red.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.all(16),
         ),
       );
     }

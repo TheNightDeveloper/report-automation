@@ -120,10 +120,16 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
     try {
       ReportCard? reportCard = await _repository.loadReportCard(studentId);
 
-      // اگر کارنامه موجود است و sportId دارد
-      if (reportCard != null && reportCard.sportId != null) {
-        final sport = await _sportRepository.getSport(reportCard.sportId!);
+      // اگر sportId مشخص شده، اولویت با اون هست
+      if (sportId != null) {
+        final sport = await _sportRepository.getSport(sportId);
         if (sport != null) {
+          if (reportCard == null) {
+            reportCard = _createEmptyReportCard(studentId, studentName, sport);
+          } else {
+            // کارنامه موجود رو با رشته جدید به‌روزرسانی کن
+            reportCard = reportCard.copyWith(sportId: sportId);
+          }
           state = state.copyWith(
             currentReportCard: reportCard,
             selectedSport: sport,
@@ -133,15 +139,10 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
         }
       }
 
-      // اگر sportId مشخص شده
-      if (sportId != null) {
-        final sport = await _sportRepository.getSport(sportId);
+      // اگر کارنامه موجود است و sportId دارد
+      if (reportCard != null && reportCard.sportId != null) {
+        final sport = await _sportRepository.getSport(reportCard.sportId!);
         if (sport != null) {
-          if (reportCard == null) {
-            reportCard = _createEmptyReportCard(studentId, studentName, sport);
-          } else {
-            reportCard = reportCard.copyWith(sportId: sportId);
-          }
           state = state.copyWith(
             currentReportCard: reportCard,
             selectedSport: sport,
