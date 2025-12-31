@@ -84,11 +84,20 @@ class StudentNotifier extends Notifier<StudentState> {
 
       List<Student> finalStudents;
       if (append) {
-        // اضافه کردن به لیست موجود (بدون تکراری)
+        // اضافه کردن به لیست موجود (بدون تکراری بر اساس ID)
         final existingIds = state.students.map((s) => s.id).toSet();
         final uniqueNewStudents = newStudents
             .where((s) => !existingIds.contains(s.id))
             .toList();
+
+        if (uniqueNewStudents.isEmpty && newStudents.isNotEmpty) {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage: 'همه دانش‌آموزان فایل قبلاً اضافه شده‌اند',
+          );
+          return;
+        }
+
         finalStudents = [...state.students, ...uniqueNewStudents];
       } else {
         // جایگزینی کامل
@@ -149,6 +158,62 @@ class StudentNotifier extends Notifier<StudentState> {
     } catch (e) {
       state = state.copyWith(
         errorMessage: 'خطا در به‌روزرسانی وضعیت دانش‌آموز: ${e.toString()}',
+      );
+    }
+  }
+
+  // اضافه کردن دانش‌آموز جدید
+  Future<void> addStudent(String name) async {
+    if (name.trim().isEmpty) {
+      state = state.copyWith(errorMessage: 'نام دانش‌آموز نمی‌تواند خالی باشد');
+      return;
+    }
+
+    try {
+      // تولید ID یکتا
+      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      final newStudent = Student(id: id, name: name.trim());
+
+      final updatedStudents = [...state.students, newStudent];
+      await _repository.saveStudents(updatedStudents);
+
+      state = state.copyWith(
+        students: updatedStudents,
+        selectedIndex: updatedStudents.length - 1, // انتخاب دانش‌آموز جدید
+      );
+    } catch (e) {
+      state = state.copyWith(
+        errorMessage: 'خطا در اضافه کردن دانش‌آموز: ${e.toString()}',
+      );
+    }
+  }
+
+  // حذف دانش‌آموز
+  Future<void> deleteStudent(String studentId) async {
+    try {
+      final updatedStudents = state.students
+          .where((student) => student.id != studentId)
+          .toList();
+
+      await _repository.saveStudents(updatedStudents);
+
+      // تنظیم مجدد selectedIndex
+      int? newSelectedIndex;
+      if (state.selectedIndex != null && updatedStudents.isNotEmpty) {
+        if (state.selectedIndex! >= updatedStudents.length) {
+          newSelectedIndex = updatedStudents.length - 1;
+        } else {
+          newSelectedIndex = state.selectedIndex;
+        }
+      }
+
+      state = state.copyWith(
+        students: updatedStudents,
+        selectedIndex: newSelectedIndex,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        errorMessage: 'خطا در حذف دانش‌آموز: ${e.toString()}',
       );
     }
   }

@@ -38,6 +38,11 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
       appBar: AppBar(
         title: const Text('لیست دانش‌آموزان'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person_add),
+            tooltip: 'اضافه کردن دانش‌آموز',
+            onPressed: _showAddStudentDialog,
+          ),
           if (studentState.students.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep),
@@ -47,10 +52,23 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
         ],
       ),
       body: _buildBody(studentState),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _importExcel,
-        icon: const Icon(Icons.upload_file),
-        label: const Text('بارگذاری فایل'),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: "add_student",
+            onPressed: _showAddStudentDialog,
+            child: const Icon(Icons.person_add),
+            tooltip: 'اضافه کردن دانش‌آموز',
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton.extended(
+            heroTag: "import_file",
+            onPressed: _importExcel,
+            icon: const Icon(Icons.upload_file),
+            label: const Text('بارگذاری فایل'),
+          ),
+        ],
       ),
     );
   }
@@ -120,14 +138,31 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
               icon: Icons.upload_file,
               height: 180,
             ),
+            const SizedBox(height: 24),
+            const Text(
+              'یا',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
             const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _showAddStudentDialog,
+              icon: const Icon(Icons.person_add),
+              label: const Text('اضافه کردن دانش‌آموز جدید'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
             Text(
               'هیچ دانش‌آموزی وجود ندارد',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
             Text(
-              'برای شروع، فایل Excel لیست دانش‌آموزان را بارگذاری کنید',
+              'برای شروع، فایل Excel لیست دانش‌آموزان را بارگذاری کنید یا دانش‌آموز جدید اضافه کنید',
               style: Theme.of(context).textTheme.bodySmall,
               textAlign: TextAlign.center,
             ),
@@ -311,7 +346,18 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                 fontSize: 12,
               ),
             ),
-            trailing: const Icon(Icons.chevron_left),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  tooltip: 'حذف دانش‌آموز',
+                  onPressed: () =>
+                      _showDeleteStudentDialog(student.id, student.name),
+                ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
             onTap: () => _openReportCard(index, student.id, student.name),
           ),
         );
@@ -420,6 +466,93 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     if (confirmed == true) {
       await ref.read(studentProvider.notifier).deleteAllStudents();
       if (mounted) _showSuccessSnackBar('همه دانش‌آموزان حذف شدند');
+    }
+  }
+
+  Future<void> _showAddStudentDialog() async {
+    final nameController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('اضافه کردن دانش‌آموز جدید'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: 'نام دانش‌آموز',
+              border: OutlineInputBorder(),
+            ),
+            textDirection: TextDirection.rtl,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'نام دانش‌آموز نمی‌تواند خالی باشد';
+              }
+              return null;
+            },
+            autofocus: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.of(context).pop(nameController.text.trim());
+              }
+            },
+            child: const Text('اضافه کردن'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      await ref.read(studentProvider.notifier).addStudent(result);
+      if (mounted) {
+        final state = ref.read(studentProvider);
+        if (state.errorMessage == null) {
+          _showSuccessSnackBar('دانش‌آموز "$result" اضافه شد');
+        }
+      }
+    }
+  }
+
+  Future<void> _showDeleteStudentDialog(
+    String studentId,
+    String studentName,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('حذف دانش‌آموز'),
+        content: Text(
+          'آیا مطمئن هستید که می‌خواهید "$studentName" را حذف کنید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await ref.read(studentProvider.notifier).deleteStudent(studentId);
+      if (mounted) _showSuccessSnackBar('دانش‌آموز "$studentName" حذف شد');
     }
   }
 

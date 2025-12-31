@@ -93,7 +93,7 @@ class ExportService {
 
       // هدر با لوگو
       yPos = _drawHeader(graphics, pageWidth, fontTitle, font, logoData, yPos);
-      yPos += 15;
+      yPos += 10;
 
       // اطلاعات دانش‌آموز
       yPos = _drawStudentInfo(
@@ -113,9 +113,10 @@ class ExportService {
         fontBold,
         font,
         reportCard.attendanceInfo,
+        sport.name,
         yPos,
       );
-      yPos += 15;
+      yPos += 20;
 
       // جدول‌های سطوح
       yPos = _drawAllSectionsNew(
@@ -200,7 +201,7 @@ class ExportService {
       format: centerFormat,
     );
 
-    return yPos + 55;
+    return yPos + 45;
   }
 
   double _drawStudentInfo(
@@ -268,6 +269,7 @@ class ExportService {
     PdfFont fontBold,
     PdfFont font,
     AttendanceInfo info,
+    String sportName,
     double yPos,
   ) {
     final PdfStringFormat rtlFormat = PdfStringFormat(
@@ -277,12 +279,19 @@ class ExportService {
 
     graphics.drawRectangle(
       pen: PdfPen(PdfColor(150, 150, 150)),
-      bounds: Rect.fromLTWH(0, yPos, pageWidth, 45),
+      bounds: Rect.fromLTWH(0, yPos, pageWidth, 60),
     );
 
     double textY = yPos + 5;
     const double lineHeight = 13;
 
+    graphics.drawString(
+      'رشته ورزشی: $sportName',
+      font,
+      bounds: Rect.fromLTWH(5, textY, pageWidth - 10, 15),
+      format: rtlFormat,
+    );
+    textY += lineHeight;
     graphics.drawString(
       'تعداد جلسات: ${_toPersianNumber(info.totalSessions)}',
       font,
@@ -406,10 +415,13 @@ class ExportService {
         : 3;
     final int rowsPerColumn = (techniqueCount / numColumns).ceil();
 
+    // محاسبه تعداد سطوح عملکرد
+    final int numRatings = performanceRatings.length;
+
     final double groupWidth = pageWidth / numColumns;
     final double numW = groupWidth * 0.12;
     final double techW = groupWidth * 0.48;
-    final double ratingW = groupWidth * 0.133;
+    final double ratingW = groupWidth * 0.133; // عرض هر rating column
 
     final centerFmt = PdfStringFormat(
       alignment: PdfTextAlignment.center,
@@ -445,7 +457,12 @@ class ExportService {
       g.drawString(
         'تکنیک',
         fontBold,
-        bounds: Rect.fromLTWH(gx + ratingW * 3, yPos + 1, techW, headerHeight),
+        bounds: Rect.fromLTWH(
+          gx + ratingW * numRatings,
+          yPos + 1,
+          techW,
+          headerHeight,
+        ),
         format: centerFmt,
       );
 
@@ -453,12 +470,12 @@ class ExportService {
       final sortedRatings = List<PerformanceRating>.from(performanceRatings)
         ..sort((a, b) => b.order.compareTo(a.order));
 
-      for (int i = 0; i < 3 && i < sortedRatings.length; i++) {
+      for (int i = 0; i < sortedRatings.length; i++) {
         g.drawString(
           sortedRatings[i].name,
           fontBold,
           bounds: Rect.fromLTWH(
-            gx + ratingW * (2 - i),
+            gx + ratingW * (numRatings - 1 - i),
             yPos + 1,
             ratingW,
             headerHeight,
@@ -488,7 +505,7 @@ class ExportService {
     for (int col = 0; col < numColumns; col++) {
       final double gx = col * groupWidth;
       // خط بین rating columns
-      for (int i = 1; i < 4; i++) {
+      for (int i = 1; i <= numRatings; i++) {
         g.drawLine(
           PdfPen(PdfColor(180, 180, 180), width: 0.5),
           Offset(gx + ratingW * i, gridStartY),
@@ -498,8 +515,8 @@ class ExportService {
       // خط بین تکنیک و ردیف
       g.drawLine(
         PdfPen(PdfColor(180, 180, 180), width: 0.5),
-        Offset(gx + ratingW * 3 + techW, gridStartY),
-        Offset(gx + ratingW * 3 + techW, gridStartY + gridHeight),
+        Offset(gx + ratingW * numRatings + techW, gridStartY),
+        Offset(gx + ratingW * numRatings + techW, gridStartY + gridHeight),
       );
     }
 
@@ -539,7 +556,7 @@ class ExportService {
             technique.name,
             font,
             bounds: Rect.fromLTWH(
-              gx + ratingW * 3 + 2,
+              gx + ratingW * numRatings + 2,
               yPos + 2,
               techW - 4,
               rowHeight,
@@ -561,8 +578,9 @@ class ExportService {
             final ratingIndex = sortedRatings.indexWhere(
               (r) => r.id == selectedRating.id,
             );
-            if (ratingIndex >= 0 && ratingIndex < 3) {
-              final double cx = gx + ratingW * (2 - ratingIndex) + ratingW / 2;
+            if (ratingIndex >= 0 && ratingIndex < sortedRatings.length) {
+              final double cx =
+                  gx + ratingW * (numRatings - 1 - ratingIndex) + ratingW / 2;
               final double cy = yPos + rowHeight / 2;
 
               // انتخاب رنگ بر اساس ترتیب
@@ -571,8 +589,10 @@ class ExportService {
                 color = PdfColor(22, 163, 74); // سبز برای بهترین
               } else if (ratingIndex == 1) {
                 color = PdfColor(37, 99, 235); // آبی برای متوسط
+              } else if (ratingIndex == 2) {
+                color = PdfColor(234, 88, 12); // نارنجی
               } else {
-                color = PdfColor(234, 88, 12); // نارنجی برای ضعیف‌تر
+                color = PdfColor(220, 38, 38); // قرمز برای بقیه
               }
 
               g.drawEllipse(
@@ -789,29 +809,32 @@ class ExportService {
         1,
         4,
       );
+      _addExcelInfoRow(sheet, currentRow, 'رشته ورزشی:', sport.name, 6, 8);
       _addExcelInfoRow(
         sheet,
         currentRow,
         'تعداد جلسات:',
         _toPersianNumber(reportCard.attendanceInfo.totalSessions ?? '-'),
-        6,
-        8,
-      );
-      _addExcelInfoRow(
-        sheet,
-        currentRow,
-        'جلسات حاضر:',
-        _toPersianNumber(reportCard.attendanceInfo.attendedSessions ?? '-'),
         10,
         12,
       );
       _addExcelInfoRow(
         sheet,
         currentRow,
-        'سطح عملکرد:',
-        reportCard.attendanceInfo.performanceLevel ?? '-',
+        'جلسات حاضر:',
+        _toPersianNumber(reportCard.attendanceInfo.attendedSessions ?? '-'),
         14,
         16,
+      );
+      currentRow++;
+
+      _addExcelInfoRow(
+        sheet,
+        currentRow,
+        'سطح عملکرد:',
+        reportCard.attendanceInfo.performanceLevel ?? '-',
+        1,
+        4,
       );
       currentRow += 2;
 
@@ -848,50 +871,79 @@ class ExportService {
         levelHeader.rowHeight = 22;
         currentRow++;
 
-        // هدر جدول - 3 گروه
-        _addExcelTableHeaderNew(sheet, currentRow, 1, sport.performanceRatings);
-        _addExcelTableHeaderNew(sheet, currentRow, 6, sport.performanceRatings);
-        _addExcelTableHeaderNew(
-          sheet,
-          currentRow,
-          11,
-          sport.performanceRatings,
-        );
-        sheet.getRangeByIndex(currentRow, 1, currentRow, 16).rowHeight = 18;
-        currentRow++;
+        // محاسبه تعداد ستون‌ها و ردیف‌ها بر اساس تعداد تکنیک‌ها
+        final int techniqueCount = level.techniques.length;
+        final int numColumns = techniqueCount <= 3
+            ? 1
+            : (techniqueCount <= 6 ? 2 : 3);
+        final int rowsPerColumn = (techniqueCount / numColumns).ceil();
 
-        // داده‌های تکنیک‌ها - 3 ردیف
-        for (int row = 0; row < 3; row++) {
-          // گروه 1 (تکنیک 0-2)
-          _addExcelTechniqueRowNew(
+        // هدر جدول - بر اساس تعداد ستون‌های محاسبه شده
+        if (numColumns >= 1) {
+          _addExcelTableHeaderNew(
             sheet,
             currentRow,
             1,
-            level.techniques,
-            levelEvaluation,
             sport.performanceRatings,
-            row,
           );
-          // گروه 2 (تکنیک 3-5)
-          _addExcelTechniqueRowNew(
+        }
+        if (numColumns >= 2) {
+          _addExcelTableHeaderNew(
             sheet,
             currentRow,
             6,
-            level.techniques,
-            levelEvaluation,
             sport.performanceRatings,
-            row + 3,
           );
-          // گروه 3 (تکنیک 6-8)
-          _addExcelTechniqueRowNew(
+        }
+        if (numColumns >= 3) {
+          _addExcelTableHeaderNew(
             sheet,
             currentRow,
             11,
-            level.techniques,
-            levelEvaluation,
             sport.performanceRatings,
-            row + 6,
           );
+        }
+        sheet.getRangeByIndex(currentRow, 1, currentRow, 16).rowHeight = 18;
+        currentRow++;
+
+        // داده‌های تکنیک‌ها - بر اساس تعداد ردیف‌های محاسبه شده
+        for (int row = 0; row < rowsPerColumn; row++) {
+          // گروه 1
+          if (numColumns >= 1) {
+            _addExcelTechniqueRowNew(
+              sheet,
+              currentRow,
+              1,
+              level.techniques,
+              levelEvaluation,
+              sport.performanceRatings,
+              row,
+            );
+          }
+          // گروه 2
+          if (numColumns >= 2) {
+            _addExcelTechniqueRowNew(
+              sheet,
+              currentRow,
+              6,
+              level.techniques,
+              levelEvaluation,
+              sport.performanceRatings,
+              row + rowsPerColumn,
+            );
+          }
+          // گروه 3
+          if (numColumns >= 3) {
+            _addExcelTechniqueRowNew(
+              sheet,
+              currentRow,
+              11,
+              level.techniques,
+              levelEvaluation,
+              sport.performanceRatings,
+              row + (rowsPerColumn * 2),
+            );
+          }
           sheet.getRangeByIndex(currentRow, 1, currentRow, 16).rowHeight = 16;
           currentRow++;
         }
@@ -1005,7 +1057,7 @@ class ExportService {
     final sortedRatings = List<PerformanceRating>.from(performanceRatings)
       ..sort((a, b) => b.order.compareTo(a.order));
 
-    for (int i = 0; i < 3 && i < sortedRatings.length; i++) {
+    for (int i = 0; i < sortedRatings.length; i++) {
       headers.add(sortedRatings[i].name);
       widths.add(1);
     }
@@ -1059,7 +1111,7 @@ class ExportService {
     final sortedRatings = List<PerformanceRating>.from(performanceRatings)
       ..sort((a, b) => b.order.compareTo(a.order));
 
-    for (int i = 0; i < 3 && i < sortedRatings.length; i++) {
+    for (int i = 0; i < sortedRatings.length; i++) {
       final xlsio.Range ratingCell = sheet.getRangeByIndex(row, col);
       final isSelected =
           techniqueEval?.performanceRatingId == sortedRatings[i].id;
@@ -1072,8 +1124,10 @@ class ExportService {
           ratingCell.cellStyle.fontColor = '#16A34A'; // سبز برای بهترین
         } else if (i == 1) {
           ratingCell.cellStyle.fontColor = '#2563EB'; // آبی برای متوسط
+        } else if (i == 2) {
+          ratingCell.cellStyle.fontColor = '#EA580C'; // نارنجی
         } else {
-          ratingCell.cellStyle.fontColor = '#EA580C'; // نارنجی برای ضعیف‌تر
+          ratingCell.cellStyle.fontColor = '#DC2626'; // قرمز برای بقیه
         }
         ratingCell.cellStyle.bold = true;
       }
