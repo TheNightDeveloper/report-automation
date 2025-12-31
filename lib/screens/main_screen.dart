@@ -3,10 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 import '../viewmodels/sport_viewmodel.dart';
-import '../viewmodels/student_viewmodel.dart';
-import '../viewmodels/report_card_viewmodel.dart';
+import '../viewmodels/folder_viewmodel.dart';
 import '../models/models.dart';
-import 'student_list_screen.dart';
+import 'folders_list_screen.dart';
 import 'report_card_screen.dart';
 import 'export_screen.dart';
 import 'sports_list_screen.dart';
@@ -47,7 +46,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       onManageSports: () => _onItemTapped(4),
       onStudentSelected: () => _onItemTapped(1),
     ),
-    StudentListScreen(
+    FoldersListScreen(
       onStudentSelected: () => _onItemTapped(2),
       selectedSportId: _selectedSport?.id,
     ),
@@ -64,9 +63,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       label: 'داشبورد',
     ),
     NavigationItem(
-      icon: Icons.people_outline,
-      selectedIcon: Icons.people,
-      label: 'دانش‌آموزان',
+      icon: Icons.folder_outlined,
+      selectedIcon: Icons.folder,
+      label: 'پوشه‌ها',
     ),
     NavigationItem(
       icon: Icons.description_outlined,
@@ -91,28 +90,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   ];
 
   void _onSportSelected(Sport sport) {
-    final previousSport = _selectedSport;
     setState(() {
       _selectedSport = sport;
     });
     ref.read(sportProvider.notifier).selectSport(sport);
-
-    // اگر رشته واقعاً عوض شده و دانش‌آموزی انتخاب شده، کارنامه رو با رشته جدید reload کن
-    if (previousSport?.id != sport.id) {
-      final studentState = ref.read(studentProvider);
-      if (studentState.selectedStudent != null) {
-        // کمی تاخیر برای اطمینان از به‌روزرسانی UI
-        Future.delayed(const Duration(milliseconds: 100), () {
-          ref
-              .read(reportCardProvider.notifier)
-              .loadReportCard(
-                studentState.selectedStudent!.id,
-                studentState.selectedStudent!.name,
-                sportId: sport.id,
-              );
-        });
-      }
-    }
   }
 
   @override
@@ -397,7 +378,7 @@ class _DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sportState = ref.watch(sportProvider);
-    final studentState = ref.watch(studentProvider);
+    final folderState = ref.watch(folderProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -408,7 +389,7 @@ class _DashboardScreen extends ConsumerWidget {
             tooltip: 'بارگذاری مجدد',
             onPressed: () {
               ref.read(sportProvider.notifier).loadSports();
-              ref.read(studentProvider.notifier).loadStudents();
+              ref.read(folderProvider.notifier).loadFolders();
             },
           ),
         ],
@@ -425,7 +406,7 @@ class _DashboardScreen extends ConsumerWidget {
                   const SizedBox(height: 24),
 
                   // آمار کلی
-                  _buildStatsRow(context, sportState, studentState),
+                  _buildStatsRow(context, sportState, folderState),
                   const SizedBox(height: 24),
 
                   // رشته‌های ورزشی
@@ -500,7 +481,7 @@ class _DashboardScreen extends ConsumerWidget {
   Widget _buildStatsRow(
     BuildContext context,
     SportState sportState,
-    StudentState studentState,
+    FolderState folderState,
   ) {
     return Row(
       children: [
@@ -519,7 +500,7 @@ class _DashboardScreen extends ConsumerWidget {
             context,
             icon: Icons.people,
             title: 'دانش‌آموزان',
-            value: studentState.students.length.toString(),
+            value: folderState.totalStudents.toString(),
             color: Colors.green,
           ),
         ),
@@ -527,9 +508,9 @@ class _DashboardScreen extends ConsumerWidget {
         Expanded(
           child: _buildStatCard(
             context,
-            icon: Icons.check_circle,
-            title: 'کارنامه تکمیل',
-            value: studentState.completedCount.toString(),
+            icon: Icons.folder,
+            title: 'پوشه‌ها',
+            value: folderState.folders.length.toString(),
             color: Colors.orange,
           ),
         ),

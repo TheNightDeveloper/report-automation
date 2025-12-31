@@ -1,70 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
-import '../viewmodels/student_viewmodel.dart';
+import '../viewmodels/folder_viewmodel.dart';
 import '../viewmodels/report_card_viewmodel.dart';
+import '../models/models.dart';
+import '../services/excel_import_service.dart';
 import '../widgets/drop_zone.dart';
 
-enum ImportAction { append, replace }
-
-class StudentListScreen extends ConsumerStatefulWidget {
-  final VoidCallback? onStudentSelected;
+class FolderStudentsScreen extends ConsumerStatefulWidget {
+  final String folderId;
   final String? selectedSportId;
+  final VoidCallback? onStudentSelected;
 
-  const StudentListScreen({
+  const FolderStudentsScreen({
     super.key,
-    this.onStudentSelected,
+    required this.folderId,
     this.selectedSportId,
+    this.onStudentSelected,
   });
 
   @override
-  ConsumerState<StudentListScreen> createState() => _StudentListScreenState();
+  ConsumerState<FolderStudentsScreen> createState() =>
+      _FolderStudentsScreenState();
 }
 
-class _StudentListScreenState extends ConsumerState<StudentListScreen> {
-  @override
-  void initState() {
-    super.initState();
-    Future.microtask(() {
-      ref.read(studentProvider.notifier).loadStudents();
-    });
-  }
+class _FolderStudentsScreenState extends ConsumerState<FolderStudentsScreen> {
+  int? _selectedStudentIndex;
 
   @override
   Widget build(BuildContext context) {
-    final studentState = ref.watch(studentProvider);
+    final folderState = ref.watch(folderProvider);
+    final folder = folderState.folders
+        .where((f) => f.id == widget.folderId)
+        .firstOrNull;
+
+    if (folder == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('پوشه یافت نشد')),
+        body: const Center(child: Text('پوشه مورد نظر یافت نشد')),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('لیست دانش‌آموزان'),
+        title: Text(folder.name),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_add),
             tooltip: 'اضافه کردن دانش‌آموز',
-            onPressed: _showAddStudentDialog,
+            onPressed: () => _showAddStudentDialog(folder),
           ),
-          if (studentState.students.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep),
-              tooltip: 'حذف همه دانش‌آموزان',
-              onPressed: () => _showDeleteAllDialog(),
-            ),
         ],
       ),
-      body: _buildBody(studentState),
+      body: _buildBody(folder),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           FloatingActionButton(
             heroTag: "add_student",
-            onPressed: _showAddStudentDialog,
+            onPressed: () => _showAddStudentDialog(folder),
             child: const Icon(Icons.person_add),
             tooltip: 'اضافه کردن دانش‌آموز',
           ),
           const SizedBox(height: 8),
           FloatingActionButton.extended(
             heroTag: "import_file",
-            onPressed: _importExcel,
+            onPressed: () => _importExcel(folder),
             icon: const Icon(Icons.upload_file),
             label: const Text('بارگذاری فایل'),
           ),
@@ -73,66 +74,31 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     );
   }
 
-  Widget _buildBody(StudentState state) {
-    if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (state.errorMessage != null) {
-      return _buildErrorState(state);
-    }
-
-    if (state.students.isEmpty) {
-      return _buildEmptyState();
+  Widget _buildBody(Folder folder) {
+    if (folder.students.isEmpty) {
+      return _buildEmptyState(folder);
     }
 
     return Column(
       children: [
-        _buildStats(state),
+        _buildStats(folder),
         const Divider(height: 1),
-        Expanded(child: _buildStudentList(state)),
+        Expanded(child: _buildStudentList(folder)),
       ],
     );
   }
 
-  Widget _buildErrorState(StudentState state) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Theme.of(context).colorScheme.error,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            state.errorMessage!,
-            style: Theme.of(context).textTheme.bodyLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => ref.read(studentProvider.notifier).clearError(),
-            icon: const Icon(Icons.refresh),
-            label: const Text('تلاش مجدد'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(Folder folder) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // ناحیه drag & drop
             FileDropArea(
               allowedExtensions: const ['xlsx', 'xls', 'csv'],
-              onFileSelected: (filePath) => _handleFileSelected(filePath),
+              onFileSelected: (filePath) =>
+                  _handleFileSelected(filePath, folder),
               title: 'فایل Excel را انتخاب کنید',
               subtitle: 'کلیک کنید یا فایل را بکشید',
               icon: Icons.upload_file,
@@ -145,7 +111,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
-              onPressed: _showAddStudentDialog,
+              onPressed: () => _showAddStudentDialog(folder),
               icon: const Icon(Icons.person_add),
               label: const Text('اضافه کردن دانش‌آموز جدید'),
               style: ElevatedButton.styleFrom(
@@ -157,7 +123,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'هیچ دانش‌آموزی وجود ندارد',
+              'این پوشه خالی است',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
@@ -172,81 +138,28 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     );
   }
 
-  Future<void> _handleFileSelected(String filePath) async {
-    if (!mounted) return;
-
-    // اگر لیست دانش‌آموز وجود داره، بپرس چیکار کنه
-    bool shouldAppend = false;
-    final currentStudents = ref.read(studentProvider).students;
-
-    if (currentStudents.isNotEmpty) {
-      final action = await _showImportOptionsDialog();
-      if (action == null) return;
-      shouldAppend = action == ImportAction.append;
-    }
-
-    _showLoadingDialog();
-
-    await ref
-        .read(studentProvider.notifier)
-        .importFromExcel(filePath, append: shouldAppend);
-
-    if (!mounted) return;
-    Navigator.of(context).pop();
-
-    final state = ref.read(studentProvider);
-    if (state.errorMessage == null && state.students.isNotEmpty) {
-      final message = shouldAppend
-          ? 'دانش‌آموزان جدید اضافه شدند. مجموع: ${state.students.length} نفر'
-          : '${state.students.length} دانش‌آموز بارگذاری شد';
-      _showSuccessSnackBar(message);
-    }
-  }
-
-  void _showLoadingDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('در حال بارگذاری...'),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStats(StudentState state) {
+  Widget _buildStats(Folder folder) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          _buildStatChip(Icons.people, '${state.students.length}', 'کل'),
+          _buildStatChip(Icons.people, '${folder.studentCount}', 'کل'),
           const SizedBox(width: 12),
           _buildStatChip(
             Icons.check_circle,
-            '${state.completedCount}',
+            '${folder.completedCount}',
             'تکمیل',
             Colors.green,
           ),
           const SizedBox(width: 12),
           _buildStatChip(
             Icons.pending,
-            '${state.students.length - state.completedCount}',
+            '${folder.studentCount - folder.completedCount}',
             'در انتظار',
             Colors.orange,
           ),
           const Spacer(),
-          _buildProgressIndicator(state),
+          _buildProgressIndicator(folder),
         ],
       ),
     );
@@ -281,19 +194,19 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     );
   }
 
-  Widget _buildProgressIndicator(StudentState state) {
+  Widget _buildProgressIndicator(Folder folder) {
     return SizedBox(
       width: 100,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            '${state.completionPercentage.toStringAsFixed(0)}%',
+            '${folder.completionPercentage.toStringAsFixed(0)}%',
             style: Theme.of(context).textTheme.labelLarge,
           ),
           const SizedBox(height: 4),
           LinearProgressIndicator(
-            value: state.completionPercentage / 100,
+            value: folder.completionPercentage / 100,
             backgroundColor: Theme.of(
               context,
             ).colorScheme.surfaceContainerHighest,
@@ -303,13 +216,13 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     );
   }
 
-  Widget _buildStudentList(StudentState state) {
+  Widget _buildStudentList(Folder folder) {
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: state.students.length,
+      itemCount: folder.students.length,
       itemBuilder: (context, index) {
-        final student = state.students[index];
-        final isSelected = state.selectedIndex == index;
+        final student = folder.students[index];
+        final isSelected = _selectedStudentIndex == index;
 
         return Card(
           elevation: isSelected ? 3 : 1,
@@ -352,8 +265,11 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
                 IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
                   tooltip: 'حذف دانش‌آموز',
-                  onPressed: () =>
-                      _showDeleteStudentDialog(student.id, student.name),
+                  onPressed: () => _showDeleteStudentDialog(
+                    folder,
+                    student.id,
+                    student.name,
+                  ),
                 ),
                 const Icon(Icons.chevron_right),
               ],
@@ -366,10 +282,10 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
   }
 
   void _openReportCard(int index, String studentId, String studentName) {
-    // انتخاب دانش‌آموز
-    ref.read(studentProvider.notifier).selectStudent(index);
+    setState(() {
+      _selectedStudentIndex = index;
+    });
 
-    // بارگذاری کارنامه با رشته ورزشی انتخاب شده
     ref
         .read(reportCardProvider.notifier)
         .loadReportCard(
@@ -378,13 +294,37 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
           sportId: widget.selectedSportId,
         );
 
-    // اطلاع به parent برای تغییر تب (اگر callback داده شده)
     if (widget.onStudentSelected != null) {
       widget.onStudentSelected!();
     }
+    Navigator.of(context).pop();
   }
 
-  Future<void> _importExcel() async {
+  Future<void> _handleFileSelected(String filePath, Folder folder) async {
+    if (!mounted) return;
+
+    _showLoadingDialog();
+
+    try {
+      final excelService = ExcelImportService();
+      final students = await excelService.importStudentsFromExcel(filePath);
+
+      await ref
+          .read(folderProvider.notifier)
+          .addStudentsToFolder(widget.folderId, students);
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+
+      _showSuccessSnackBar('${students.length} دانش‌آموز به پوشه اضافه شد');
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      _showErrorSnackBar('خطا: ${e.toString()}');
+    }
+  }
+
+  Future<void> _importExcel(Folder folder) async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -393,7 +333,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
       );
 
       if (result != null && result.files.single.path != null) {
-        await _handleFileSelected(result.files.single.path!);
+        await _handleFileSelected(result.files.single.path!, folder);
       }
     } catch (e) {
       if (!mounted) return;
@@ -401,75 +341,7 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     }
   }
 
-  Future<ImportAction?> _showImportOptionsDialog() async {
-    return showDialog<ImportAction>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('بارگذاری فایل جدید'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'شما در حال حاضر ${ref.read(studentProvider).students.length} دانش‌آموز دارید.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            const Text('چه کاری انجام دهم؟'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('انصراف'),
-          ),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.of(context).pop(ImportAction.append),
-            icon: const Icon(Icons.add),
-            label: const Text('اضافه کردن به لیست'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.of(context).pop(ImportAction.replace),
-            icon: const Icon(Icons.sync),
-            label: const Text('جایگزینی کامل'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _showDeleteAllDialog() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('حذف همه دانش‌آموزان'),
-        content: const Text('آیا مطمئن هستید؟ این عمل قابل بازگشت نیست!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('انصراف'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await ref.read(studentProvider.notifier).deleteAllStudents();
-      if (mounted) _showSuccessSnackBar('همه دانش‌آموزان حذف شدند');
-    }
-  }
-
-  Future<void> _showAddStudentDialog() async {
+  Future<void> _showAddStudentDialog(Folder folder) async {
     final nameController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
@@ -513,17 +385,21 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     );
 
     if (result != null && result.isNotEmpty) {
-      await ref.read(studentProvider.notifier).addStudent(result);
+      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      final newStudent = Student(id: id, name: result);
+
+      await ref
+          .read(folderProvider.notifier)
+          .addStudentToFolder(widget.folderId, newStudent);
+
       if (mounted) {
-        final state = ref.read(studentProvider);
-        if (state.errorMessage == null) {
-          _showSuccessSnackBar('دانش‌آموز "$result" اضافه شد');
-        }
+        _showSuccessSnackBar('دانش‌آموز "$result" اضافه شد');
       }
     }
   }
 
   Future<void> _showDeleteStudentDialog(
+    Folder folder,
     String studentId,
     String studentName,
   ) async {
@@ -551,9 +427,33 @@ class _StudentListScreenState extends ConsumerState<StudentListScreen> {
     );
 
     if (confirmed == true) {
-      await ref.read(studentProvider.notifier).deleteStudent(studentId);
+      await ref
+          .read(folderProvider.notifier)
+          .removeStudentFromFolder(widget.folderId, studentId);
       if (mounted) _showSuccessSnackBar('دانش‌آموز "$studentName" حذف شد');
     }
+  }
+
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('در حال بارگذاری...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showSuccessSnackBar(String message) {

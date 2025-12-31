@@ -3,20 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../viewmodels/report_card_viewmodel.dart';
-import '../viewmodels/student_viewmodel.dart';
 import '../viewmodels/app_data_viewmodel.dart';
 import '../models/models.dart';
 import '../widgets/drop_zone.dart';
 
 // Intent classes for keyboard shortcuts
-class _PreviousStudentIntent extends Intent {
-  const _PreviousStudentIntent();
-}
-
-class _NextStudentIntent extends Intent {
-  const _NextStudentIntent();
-}
-
 class _SaveIntent extends Intent {
   const _SaveIntent();
 }
@@ -27,38 +18,14 @@ class ReportCardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reportCardState = ref.watch(reportCardProvider);
-    final studentState = ref.watch(studentProvider);
 
     return Shortcuts(
       shortcuts: <ShortcutActivator, Intent>{
-        const SingleActivator(LogicalKeyboardKey.arrowLeft):
-            const _PreviousStudentIntent(),
-        const SingleActivator(LogicalKeyboardKey.arrowRight):
-            const _NextStudentIntent(),
         const SingleActivator(LogicalKeyboardKey.keyS, control: true):
             const _SaveIntent(),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
-          _PreviousStudentIntent: CallbackAction<_PreviousStudentIntent>(
-            onInvoke: (_) {
-              if (studentState.selectedIndex != null &&
-                  studentState.selectedIndex! > 0) {
-                _navigateToPrevious(ref);
-              }
-              return null;
-            },
-          ),
-          _NextStudentIntent: CallbackAction<_NextStudentIntent>(
-            onInvoke: (_) {
-              if (studentState.selectedIndex != null &&
-                  studentState.selectedIndex! <
-                      studentState.students.length - 1) {
-                _navigateToNext(ref);
-              }
-              return null;
-            },
-          ),
           _SaveIntent: CallbackAction<_SaveIntent>(
             onInvoke: (_) {
               ref.read(reportCardProvider.notifier).saveReportCard();
@@ -70,7 +37,7 @@ class ReportCardScreen extends ConsumerWidget {
           autofocus: true,
           child: Scaffold(
             appBar: AppBar(
-              title: _buildAppBarTitle(studentState),
+              title: const Text('کارنامه'),
               actions: [
                 if (reportCardState.currentReportCard != null)
                   IconButton(
@@ -82,175 +49,25 @@ class ReportCardScreen extends ConsumerWidget {
                   ),
               ],
             ),
-            body: _buildBody(context, ref, reportCardState, studentState),
-            bottomNavigationBar: studentState.students.isNotEmpty
-                ? _buildNavigationBar(context, ref, studentState)
-                : null,
+            body: _buildBody(context, ref, reportCardState),
           ),
         ),
       ),
     );
-  }
-
-  Widget _buildAppBarTitle(StudentState studentState) {
-    if (studentState.selectedStudent == null) {
-      return const Text('کارنامه');
-    }
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text('کارنامه'),
-        Text(
-          '${studentState.selectedIndex! + 1} از ${studentState.students.length}',
-          style: const TextStyle(fontSize: 12),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNavigationBar(
-    BuildContext context,
-    WidgetRef ref,
-    StudentState studentState,
-  ) {
-    final canGoPrevious =
-        studentState.selectedIndex != null && studentState.selectedIndex! > 0;
-    final canGoNext =
-        studentState.selectedIndex != null &&
-        studentState.selectedIndex! < studentState.students.length - 1;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Previous Button
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: canGoPrevious ? () => _navigateToPrevious(ref) : null,
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('دانش‌آموز قبلی'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-
-          // Student Info
-          if (studentState.selectedStudent != null)
-            Expanded(
-              flex: 2,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      studentState.selectedStudent!.name,
-                      style: Theme.of(context).textTheme.titleMedium,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${studentState.selectedIndex! + 1} از ${studentState.students.length}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          const SizedBox(width: 16),
-
-          // Next Button
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: canGoNext ? () => _navigateToNext(ref) : null,
-              icon: const Icon(Icons.arrow_forward),
-              label: const Text('دانش‌آموز بعدی'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _navigateToPrevious(WidgetRef ref) {
-    final studentNotifier = ref.read(studentProvider.notifier);
-    final reportCardNotifier = ref.read(reportCardProvider.notifier);
-    final currentSportId = ref.read(reportCardProvider).selectedSport?.id;
-
-    // ذخیره کارنامه فعلی
-    reportCardNotifier.saveReportCard();
-
-    // رفتن به دانش‌آموز قبلی
-    studentNotifier.selectPreviousStudent();
-
-    // بارگذاری کارنامه جدید با همان رشته ورزشی
-    final selectedStudent = ref.read(studentProvider).selectedStudent;
-    if (selectedStudent != null) {
-      reportCardNotifier.loadReportCard(
-        selectedStudent.id,
-        selectedStudent.name,
-        sportId: currentSportId,
-      );
-    }
-  }
-
-  void _navigateToNext(WidgetRef ref) {
-    final studentNotifier = ref.read(studentProvider.notifier);
-    final reportCardNotifier = ref.read(reportCardProvider.notifier);
-    final currentSportId = ref.read(reportCardProvider).selectedSport?.id;
-
-    // ذخیره کارنامه فعلی
-    reportCardNotifier.saveReportCard();
-
-    // رفتن به دانش‌آموز بعدی
-    studentNotifier.selectNextStudent();
-
-    // بارگذاری کارنامه جدید با همان رشته ورزشی
-    final selectedStudent = ref.read(studentProvider).selectedStudent;
-    if (selectedStudent != null) {
-      reportCardNotifier.loadReportCard(
-        selectedStudent.id,
-        selectedStudent.name,
-        sportId: currentSportId,
-      );
-    }
   }
 
   Widget _buildBody(
     BuildContext context,
     WidgetRef ref,
     ReportCardState reportCardState,
-    StudentState studentState,
   ) {
     // Loading
     if (reportCardState.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // No student selected
-    if (studentState.selectedStudent == null) {
+    // No report card loaded
+    if (reportCardState.currentReportCard == null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -269,7 +86,7 @@ class ReportCardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'لطفاً از بخش دانش‌آموزان، یک دانش‌آموز را انتخاب کنید',
+              'لطفاً از بخش پوشه‌ها، یک دانش‌آموز را انتخاب کنید',
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),

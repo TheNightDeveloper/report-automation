@@ -10,3 +10,4 @@ export 'level.dart';
 export 'performance_rating.dart';
 export 'sport.dart';
 export 'level_evaluation.dart';
+export 'folder.dart';

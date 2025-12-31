@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 
 class HiveService {
@@ -11,8 +13,17 @@ class HiveService {
   static Future<void> init() async {
     if (_initialized) return;
 
-    // Initialize Hive
-    await Hive.initFlutter();
+    // Get Documents directory and create custom path
+    final documentsDir = await getApplicationDocumentsDirectory();
+    final customPath = Directory('${documentsDir.path}/karnameh/data');
+
+    // Create directory if it doesn't exist
+    if (!await customPath.exists()) {
+      await customPath.create(recursive: true);
+    }
+
+    // Initialize Hive with custom path
+    await Hive.initFlutter(customPath.path);
 
     // Register adapters - existing
     if (!Hive.isAdapterRegistered(0)) {
@@ -49,6 +60,9 @@ class HiveService {
     }
     if (!Hive.isAdapterRegistered(12)) {
       Hive.registerAdapter(LevelEvaluationAdapter());
+    }
+    if (!Hive.isAdapterRegistered(13)) {
+      Hive.registerAdapter(FolderAdapter());
     }
 
     _initialized = true;
