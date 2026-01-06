@@ -16,10 +16,19 @@ class AttendanceInfoAdapter extends TypeAdapter<AttendanceInfo> {
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
+
+    // Migration: تبدیل performanceLevel قدیمی به performanceLevels جدید
+    List<String>? performanceLevels;
+    if (fields[2] is List) {
+      performanceLevels = (fields[2] as List).cast<String>();
+    } else if (fields[2] is String && (fields[2] as String).isNotEmpty) {
+      performanceLevels = [fields[2] as String];
+    }
+
     return AttendanceInfo(
       totalSessions: fields[0] as int?,
       attendedSessions: fields[1] as int?,
-      performanceLevel: fields[2] as String?,
+      performanceLevels: performanceLevels,
       sportField: fields[3] as String?,
     );
   }
@@ -33,7 +42,7 @@ class AttendanceInfoAdapter extends TypeAdapter<AttendanceInfo> {
       ..writeByte(1)
       ..write(obj.attendedSessions)
       ..writeByte(2)
-      ..write(obj.performanceLevel)
+      ..write(obj.performanceLevels)
       ..writeByte(3)
       ..write(obj.sportField);
   }

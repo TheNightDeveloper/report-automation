@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../repositories/report_card_repository.dart';
 import '../repositories/sport_repository.dart';
+import '../repositories/folder_repository.dart';
 import '../services/export_service.dart';
 
 // State class برای مدیریت export
@@ -294,6 +295,143 @@ class ExportNotifier extends Notifier<ExportState> {
     }
   }
 
+  // export همه کارنامه‌ها با فیلتر
+  Future<void> exportAllFiltered({
+    required String outputDirectory,
+    required ExportFormat format,
+    String? folderId,
+    bool onlyCompleted = false,
+  }) async {
+    state = state.copyWith(
+      isExporting: true,
+      errorMessage: null,
+      successMessage: null,
+      exportedFiles: [],
+    );
+
+    try {
+      // بارگذاری تمام رشته‌های ورزشی
+      final allSports = await _sportRepository.getAllSports();
+      final sportsMap = <String, Sport>{};
+      for (final sport in allSports) {
+        sportsMap[sport.id] = sport;
+      }
+
+      // بارگذاری همه کارنامه‌های موجود
+      final allReportCards = await _reportCardRepository.loadAllReportCards();
+      final reportCardsMap = <String, ReportCard>{};
+      for (final rc in allReportCards) {
+        reportCardsMap[rc.studentId] = rc;
+      }
+
+      // بارگذاری پوشه‌ها
+      final folderRepository = FolderRepository();
+      final folders = await folderRepository.loadFolders();
+
+      // فیلتر کردن پوشه‌ها بر اساس انتخاب کاربر
+      final selectedFolders = folderId == null
+          ? folders
+          : folders.where((f) => f.id == folderId).toList();
+
+      // جمع‌آوری دانش‌آموزان از پوشه‌های انتخاب شده
+      final allStudents = <Student>[];
+      for (final folder in selectedFolders) {
+        allStudents.addAll(folder.students);
+      }
+
+      if (allStudents.isEmpty) {
+        state = state.copyWith(
+          isExporting: false,
+          errorMessage: 'هیچ دانش‌آموزی برای export یافت نشد',
+        );
+        return;
+      }
+
+      // ساخت لیست کارنامه‌ها برای export
+      final reportCardsToExport = <ReportCard>[];
+      for (final student in allStudents) {
+        ReportCard? reportCard = reportCardsMap[student.id];
+
+        // اگر فقط کارنامه‌های تکمیل شده خواسته شده
+        if (onlyCompleted) {
+          if (reportCard == null) {
+            continue; // skip کردن دانش‌آموزانی که کارنامه ندارند
+          }
+          // چک کردن اینکه آیا کارنامه تکمیل شده یا نه
+          if (reportCard.levelEvaluations == null ||
+              reportCard.levelEvaluations!.isEmpty) {
+            continue; // skip کردن کارنامه‌های خالی
+          }
+        } else {
+          // اگر همه دانش‌آموزان خواسته شده، برای کسانی که کارنامه ندارند یک کارنامه خالی بساز
+          reportCard ??= ReportCard(
+            studentId: student.id,
+            studentInfo: StudentInfo(
+              name: student.name,
+              grade: null,
+              level: null,
+              school: null,
+              headCoach: null,
+            ),
+            attendanceInfo: AttendanceInfo(
+              totalSessions: 0,
+              attendedSessions: 0,
+              performanceLevels: [],
+            ),
+            sportId: sportsMap.isNotEmpty ? sportsMap.values.first.id : null,
+            levelEvaluations: {},
+            comments: null,
+            signatureImagePath: null,
+          );
+        }
+
+        reportCardsToExport.add(reportCard);
+      }
+
+      if (reportCardsToExport.isEmpty) {
+        state = state.copyWith(
+          isExporting: false,
+          errorMessage: onlyCompleted
+              ? 'هیچ کارنامه تکمیل شده‌ای یافت نشد'
+              : 'هیچ کارنامه‌ای برای export یافت نشد',
+        );
+        return;
+      }
+
+      state = state.copyWith(
+        totalItems: reportCardsToExport.length,
+        currentItem: 0,
+        progress: 0.0,
+      );
+
+      final exportedFiles = await _exportService.batchExport(
+        reportCards: reportCardsToExport,
+        sportsMap: sportsMap,
+        outputDirectory: outputDirectory,
+        format: format,
+        onProgress: (current, total) {
+          state = state.copyWith(
+            currentItem: current,
+            totalItems: total,
+            progress: current / total,
+          );
+        },
+      );
+
+      state = state.copyWith(
+        isExporting: false,
+        exportedFiles: exportedFiles,
+        successMessage:
+            '${exportedFiles.length} فایل با موفقیت ذخیره شد در:\n$outputDirectory',
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isExporting: false,
+        errorMessage: 'خطا در export: ${e.toString()}',
+      );
+    }
+  }
+
   // export همه کارنامه‌ها
   Future<void> exportAll({
     required String outputDirectory,
@@ -307,31 +445,76 @@ class ExportNotifier extends Notifier<ExportState> {
     );
 
     try {
-      final reportCards = await _reportCardRepository.loadAllReportCards();
-
-      if (reportCards.isEmpty) {
-        state = state.copyWith(
-          isExporting: false,
-          errorMessage: 'هیچ کارنامه‌ای برای export یافت نشد',
-        );
-        return;
-      }
-
-      state = state.copyWith(
-        totalItems: reportCards.length,
-        currentItem: 0,
-        progress: 0.0,
-      );
-
       // بارگذاری تمام رشته‌های ورزشی
       final allSports = await _sportRepository.getAllSports();
+
       final sportsMap = <String, Sport>{};
       for (final sport in allSports) {
         sportsMap[sport.id] = sport;
       }
 
+      // بارگذاری همه کارنامه‌های موجود
+      final allReportCards = await _reportCardRepository.loadAllReportCards();
+
+      // ساخت map از studentId به ReportCard
+      final reportCardsMap = <String, ReportCard>{};
+      for (final rc in allReportCards) {
+        reportCardsMap[rc.studentId] = rc;
+      }
+
+      // بارگذاری همه دانش‌آموزان از همه پوشه‌ها
+      final folderRepository = FolderRepository();
+      final folders = await folderRepository.loadFolders();
+
+      final allStudents = <Student>[];
+      for (final folder in folders) {
+        allStudents.addAll(folder.students);
+      }
+
+      if (allStudents.isEmpty) {
+        state = state.copyWith(
+          isExporting: false,
+          errorMessage: 'هیچ دانش‌آموزی برای export یافت نشد',
+        );
+        return;
+      }
+
+      state = state.copyWith(
+        totalItems: allStudents.length,
+        currentItem: 0,
+        progress: 0.0,
+      );
+
+      // ساخت لیست کارنامه‌ها برای export
+      final reportCardsToExport = <ReportCard>[];
+      for (final student in allStudents) {
+        ReportCard? reportCard = reportCardsMap[student.id];
+
+        reportCard ??= ReportCard(
+          studentId: student.id,
+          studentInfo: StudentInfo(
+            name: student.name,
+            grade: null,
+            level: null,
+            school: null,
+            headCoach: null,
+          ),
+          attendanceInfo: AttendanceInfo(
+            totalSessions: 0,
+            attendedSessions: 0,
+            performanceLevels: [],
+          ),
+          sportId: sportsMap.isNotEmpty ? sportsMap.values.first.id : null,
+          levelEvaluations: {},
+          comments: null,
+          signatureImagePath: null,
+        );
+
+        reportCardsToExport.add(reportCard);
+      }
+
       final exportedFiles = await _exportService.batchExport(
-        reportCards: reportCards,
+        reportCards: reportCardsToExport,
         sportsMap: sportsMap,
         outputDirectory: outputDirectory,
         format: format,

@@ -11,7 +11,7 @@ class AttendanceInfo {
   final int? attendedSessions; // تعداد جلسات حضور
 
   @HiveField(2)
-  final String? performanceLevel; // سطح عملکرد
+  final List<String> performanceLevels; // سطوح عملکرد (مولتی سلکت)
 
   @HiveField(3)
   final String? sportField; // رشته ورزشی
@@ -19,20 +19,20 @@ class AttendanceInfo {
   AttendanceInfo({
     this.totalSessions,
     this.attendedSessions,
-    this.performanceLevel,
+    List<String>? performanceLevels,
     this.sportField,
-  });
+  }) : performanceLevels = performanceLevels ?? [];
 
   AttendanceInfo copyWith({
     int? totalSessions,
     int? attendedSessions,
-    String? performanceLevel,
+    List<String>? performanceLevels,
     String? sportField,
   }) {
     return AttendanceInfo(
       totalSessions: totalSessions ?? this.totalSessions,
       attendedSessions: attendedSessions ?? this.attendedSessions,
-      performanceLevel: performanceLevel ?? this.performanceLevel,
+      performanceLevels: performanceLevels ?? this.performanceLevels,
       sportField: sportField ?? this.sportField,
     );
   }
@@ -41,7 +41,7 @@ class AttendanceInfo {
     return {
       'totalSessions': totalSessions,
       'attendedSessions': attendedSessions,
-      'performanceLevel': performanceLevel,
+      'performanceLevels': performanceLevels,
       'sportField': sportField,
     };
   }
@@ -50,7 +50,13 @@ class AttendanceInfo {
     return AttendanceInfo(
       totalSessions: json['totalSessions'] as int?,
       attendedSessions: json['attendedSessions'] as int?,
-      performanceLevel: json['performanceLevel'] as String?,
+      performanceLevels: json['performanceLevels'] != null
+          ? List<String>.from(json['performanceLevels'] as List)
+          : (json['performanceLevel'] != null
+                ? [
+                    json['performanceLevel'] as String,
+                  ] // migration از فیلد قدیمی
+                : null),
       sportField: json['sportField'] as String?,
     );
   }

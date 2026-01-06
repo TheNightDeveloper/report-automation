@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 import '../viewmodels/sport_viewmodel.dart';
 import '../viewmodels/folder_viewmodel.dart';
+import '../viewmodels/report_card_viewmodel.dart';
 import '../models/models.dart';
 import 'folders_list_screen.dart';
 import 'report_card_screen.dart';
@@ -94,6 +95,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       _selectedSport = sport;
     });
     ref.read(sportProvider.notifier).selectSport(sport);
+
+    // به‌روزرسانی رشته ورزشی در reportCardProvider
+    ref.read(reportCardProvider.notifier).selectSport(sport);
   }
 
   @override

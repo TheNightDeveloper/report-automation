@@ -107,7 +107,42 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
 
   // انتخاب رشته ورزشی
   void selectSport(Sport sport) {
-    state = state.copyWith(selectedSport: sport);
+    // اگر کارنامه‌ای بارگذاری شده، سطوح عملکرد را بررسی و پاک‌سازی کن
+    if (state.currentReportCard != null) {
+      final currentLevels =
+          state.currentReportCard!.attendanceInfo.performanceLevels;
+      final validLevels = currentLevels.where((levelName) {
+        return sport.levels.any((level) => level.name == levelName);
+      }).toList();
+
+      // اگر سطوح تغییر کرده، کارنامه را به‌روز کن
+      if (validLevels.length != currentLevels.length) {
+        final updatedAttendance = state.currentReportCard!.attendanceInfo
+            .copyWith(performanceLevels: validLevels);
+        final updatedReportCard = state.currentReportCard!.copyWith(
+          attendanceInfo: updatedAttendance,
+          sportId: sport.id,
+        );
+        state = state.copyWith(
+          selectedSport: sport,
+          currentReportCard: updatedReportCard,
+        );
+        _autoSave();
+        return;
+      }
+
+      // فقط sportId را به‌روز کن
+      final updatedReportCard = state.currentReportCard!.copyWith(
+        sportId: sport.id,
+      );
+      state = state.copyWith(
+        selectedSport: sport,
+        currentReportCard: updatedReportCard,
+      );
+      _autoSave();
+    } else {
+      state = state.copyWith(selectedSport: sport);
+    }
   }
 
   // بارگذاری کارنامه برای دانش‌آموز با رشته ورزشی
@@ -129,6 +164,8 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
           } else {
             // کارنامه موجود رو با رشته جدید به‌روزرسانی کن
             reportCard = reportCard.copyWith(sportId: sportId);
+            // اعتبارسنجی سطوح عملکرد
+            reportCard = _validatePerformanceLevels(reportCard, sport);
           }
           state = state.copyWith(
             currentReportCard: reportCard,
@@ -143,6 +180,9 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
       if (reportCard != null && reportCard.sportId != null) {
         final sport = await _sportRepository.getSport(reportCard.sportId!);
         if (sport != null) {
+          // اعتبارسنجی و پاک‌سازی سطوح عملکرد
+          reportCard = _validatePerformanceLevels(reportCard, sport);
+
           state = state.copyWith(
             currentReportCard: reportCard,
             selectedSport: sport,
@@ -160,6 +200,9 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
           studentName,
           defaultSport,
         );
+        // اعتبارسنجی سطوح عملکرد
+        reportCard = _validatePerformanceLevels(reportCard, defaultSport);
+
         state = state.copyWith(
           currentReportCard: reportCard,
           selectedSport: defaultSport,
@@ -214,7 +257,7 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
       attendanceInfo: AttendanceInfo(
         totalSessions: 0,
         attendedSessions: 0,
-        performanceLevel: null,
+        performanceLevels: [],
       ),
       sportId: sport.id,
       levelEvaluations: levelEvaluations,
@@ -270,7 +313,7 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
   void updateAttendanceInfo({
     int? totalSessions,
     int? attendedSessions,
-    String? performanceLevel,
+    List<String>? performanceLevels,
   }) {
     if (state.currentReportCard == null) return;
 
@@ -278,7 +321,7 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
       final updatedInfo = state.currentReportCard!.attendanceInfo.copyWith(
         totalSessions: totalSessions,
         attendedSessions: attendedSessions,
-        performanceLevel: performanceLevel,
+        performanceLevels: performanceLevels,
       );
 
       final updatedReportCard = state.currentReportCard!.copyWith(
@@ -396,9 +439,9 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
   void updateSignatureImage(String? imagePath) {
     if (state.currentReportCard == null) return;
 
-    final updatedReportCard = state.currentReportCard!.copyWith(
-      signatureImagePath: imagePath,
-    );
+    final updatedReportCard = imagePath == null
+        ? state.currentReportCard!.copyWith(clearSignatureImage: true)
+        : state.currentReportCard!.copyWith(signatureImagePath: imagePath);
 
     state = state.copyWith(currentReportCard: updatedReportCard);
     _autoSave();
@@ -431,6 +474,28 @@ class ReportCardNotifier extends Notifier<ReportCardState> {
     } catch (e) {
       return null;
     }
+  }
+
+  // اعتبارسنجی و پاک‌سازی سطوح عملکرد نامعتبر
+  ReportCard _validatePerformanceLevels(ReportCard reportCard, Sport sport) {
+    final currentLevels = reportCard.attendanceInfo.performanceLevels;
+
+    // فیلتر کردن سطوح معتبر
+    final validLevels = currentLevels.where((levelName) {
+      return sport.levels.any((level) => level.name == levelName);
+    }).toList();
+
+    // اگر تغییری نکرده، همان کارنامه را برگردان
+    if (validLevels.length == currentLevels.length) {
+      return reportCard;
+    }
+
+    // به‌روزرسانی کارنامه با سطوح معتبر
+    final updatedAttendance = reportCard.attendanceInfo.copyWith(
+      performanceLevels: validLevels,
+    );
+
+    return reportCard.copyWith(attendanceInfo: updatedAttendance);
   }
 }
 

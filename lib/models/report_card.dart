@@ -52,6 +52,7 @@ class ReportCard {
     String? signatureImagePath,
     String? sportId,
     Map<String, LevelEvaluation>? levelEvaluations,
+    bool clearSignatureImage = false, // پارامتر جدید برای پاک کردن امضا
   }) {
     return ReportCard(
       studentId: studentId ?? this.studentId,
@@ -59,7 +60,9 @@ class ReportCard {
       attendanceInfo: attendanceInfo ?? this.attendanceInfo,
       sections: sections ?? this.sections,
       comments: comments ?? this.comments,
-      signatureImagePath: signatureImagePath ?? this.signatureImagePath,
+      signatureImagePath: clearSignatureImage
+          ? null
+          : (signatureImagePath ?? this.signatureImagePath),
       sportId: sportId ?? this.sportId,
       levelEvaluations: levelEvaluations ?? this.levelEvaluations,
     );

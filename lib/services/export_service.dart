@@ -307,7 +307,7 @@ class ExportService {
     );
     textY += lineHeight;
     graphics.drawString(
-      'سطح عملکرد: ${info.performanceLevel ?? "-"}',
+      'سطوح عملکرد: ${info.performanceLevels.isEmpty ? "-" : info.performanceLevels.join("، ")}',
       font,
       bounds: Rect.fromLTWH(5, textY, pageWidth - 10, 15),
       format: rtlFormat,
@@ -421,7 +421,10 @@ class ExportService {
     final double groupWidth = pageWidth / numColumns;
     final double numW = groupWidth * 0.12;
     final double techW = groupWidth * 0.48;
-    final double ratingW = groupWidth * 0.133; // عرض هر rating column
+    // محاسبه عرض هر rating column براساس تعداد سطوح عملکرد
+    final double totalRatingWidth =
+        groupWidth * 0.4; // 40% از عرض گروه برای rating ها
+    final double ratingW = totalRatingWidth / numRatings;
 
     final centerFmt = PdfStringFormat(
       alignment: PdfTextAlignment.center,
@@ -646,15 +649,11 @@ class ExportService {
 
     // نمایش امضا در سمت چپ پایین باکس
     if (signatureImagePath != null && signatureImagePath.isNotEmpty) {
-      print('DEBUG: Trying to load signature from: $signatureImagePath');
       try {
         final signatureFile = File(signatureImagePath);
-        print('DEBUG: File exists: ${signatureFile.existsSync()}');
         if (signatureFile.existsSync()) {
           final signatureBytes = signatureFile.readAsBytesSync();
-          print('DEBUG: Signature bytes length: ${signatureBytes.length}');
           final signatureImage = PdfBitmap(signatureBytes);
-          print('DEBUG: PdfBitmap created successfully');
 
           // رسم امضا در گوشه چپ پایین
           final double signatureWidth = 60;
@@ -671,7 +670,6 @@ class ExportService {
               signatureHeight,
             ),
           );
-          print('DEBUG: Signature drawn successfully');
 
           // برچسب امضا
           g.drawString(
@@ -688,15 +686,10 @@ class ExportService {
               textDirection: PdfTextDirection.rightToLeft,
             ),
           );
-        } else {
-          print('DEBUG: Signature file does not exist');
         }
       } catch (e) {
         // در صورت خطا در بارگذاری تصویر، فقط متن نمایش داده می‌شود
-        print('خطا در بارگذاری تصویر امضا: $e');
       }
-    } else {
-      print('DEBUG: No signature path provided or empty');
     }
   }
 
@@ -831,8 +824,10 @@ class ExportService {
       _addExcelInfoRow(
         sheet,
         currentRow,
-        'سطح عملکرد:',
-        reportCard.attendanceInfo.performanceLevel ?? '-',
+        'سطوح عملکرد:',
+        reportCard.attendanceInfo.performanceLevels.isEmpty
+            ? '-'
+            : reportCard.attendanceInfo.performanceLevels.join('، '),
         1,
         4,
       );
@@ -1001,7 +996,7 @@ class ExportService {
             signatureLabel.cellStyle.hAlign = xlsio.HAlignType.right;
           }
         } catch (e) {
-          print('خطا در اضافه کردن امضا به Excel: $e');
+          // خطا در اضافه کردن امضا
         }
       }
 
@@ -1145,15 +1140,22 @@ class ExportService {
     Function(int current, int total)? onProgress,
   }) async {
     final exportedFiles = <String>[];
+    final errors = <String>[];
 
     for (int i = 0; i < reportCards.length; i++) {
       try {
         final reportCard = reportCards[i];
-        final sport = sportsMap[reportCard.sportId];
+        Sport? sport = sportsMap[reportCard.sportId];
 
+        // اگر رشته ورزشی یافت نشد، سعی کن رشته پیش‌فرض رو بگیری
         if (sport == null) {
-          // اگر رشته ورزشی یافت نشد، از رشته پیش‌فرض استفاده کن
-          continue;
+          // اگر sportsMap خالی نیست، از اولین رشته استفاده کن
+          if (sportsMap.isNotEmpty) {
+            sport = sportsMap.values.first;
+          } else {
+            errors.add('${reportCard.studentInfo.name}: رشته ورزشی یافت نشد');
+            continue;
+          }
         }
 
         final filePath = format == ExportFormat.pdf
@@ -1171,12 +1173,16 @@ class ExportService {
         exportedFiles.add(filePath);
         onProgress?.call(i + 1, reportCards.length);
       } catch (e) {
+        errors.add('${reportCards[i].studentInfo.name}: ${e.toString()}');
         continue;
       }
     }
 
     if (exportedFiles.isEmpty) {
-      throw Exception('هیچ فایلی export نشد');
+      final errorMessage = errors.isNotEmpty
+          ? 'خطاها:\n${errors.join('\n')}'
+          : 'هیچ فایلی export نشد';
+      throw Exception(errorMessage);
     }
 
     return exportedFiles;

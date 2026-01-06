@@ -396,36 +396,38 @@ class ReportCardScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: 16),
 
-                // سطح عملکرد
+                // سطوح عملکرد (مولتی سلکت)
                 Expanded(
-                  child: DropdownButtonFormField<String>(
-                    key: ValueKey(
-                      'performanceLevel_${reportCard.studentInfo.name}_${selectedSport?.id}',
+                  child: InkWell(
+                    onTap: () => _showPerformanceLevelDialog(
+                      context,
+                      ref,
+                      reportCard,
+                      selectedSport,
                     ),
-                    value:
-                        _isValidPerformanceLevel(
-                          reportCard.attendanceInfo.performanceLevel,
-                          selectedSport,
-                        )
-                        ? reportCard.attendanceInfo.performanceLevel
-                        : null,
-                    decoration: const InputDecoration(
-                      labelText: 'سطح عملکرد',
-                      prefixIcon: Icon(Icons.emoji_events),
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'سطوح عملکرد',
+                        prefixIcon: Icon(Icons.emoji_events),
+                        border: OutlineInputBorder(),
+                      ),
+                      child: Text(
+                        reportCard.attendanceInfo.performanceLevels.isEmpty
+                            ? 'انتخاب کنید...'
+                            : reportCard.attendanceInfo.performanceLevels.join(
+                                '، ',
+                              ),
+                        style: TextStyle(
+                          color:
+                              reportCard
+                                  .attendanceInfo
+                                  .performanceLevels
+                                  .isEmpty
+                              ? Theme.of(context).hintColor
+                              : null,
+                        ),
+                      ),
                     ),
-                    items:
-                        selectedSport?.levels.map((level) {
-                          return DropdownMenuItem<String>(
-                            value: level.name,
-                            child: Text(level.name),
-                          );
-                        }).toList() ??
-                        [],
-                    onChanged: (value) {
-                      ref
-                          .read(reportCardProvider.notifier)
-                          .updateAttendanceInfo(performanceLevel: value ?? '');
-                    },
                   ),
                 ),
               ],
@@ -462,13 +464,14 @@ class ReportCardScreen extends ConsumerWidget {
     final sortedLevels = List<Level>.from(selectedSport.levels)
       ..sort((a, b) => a.order.compareTo(b.order));
 
-    // سطح عملکرد انتخاب شده
-    final selectedPerformanceLevel = reportCard.attendanceInfo.performanceLevel;
+    // سطوح عملکرد انتخاب شده
+    final selectedPerformanceLevels =
+        reportCard.attendanceInfo.performanceLevels;
 
     return Column(
       children: sortedLevels.map((level) {
         final levelEvaluation = reportCard.levelEvaluations?[level.id];
-        final isActive = selectedPerformanceLevel == level.name;
+        final isActive = selectedPerformanceLevels.contains(level.name);
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
@@ -959,12 +962,63 @@ class ReportCardScreen extends ConsumerWidget {
     );
   }
 
-  // بررسی اینکه آیا سطح عملکرد معتبر است
-  bool _isValidPerformanceLevel(String? performanceLevel, Sport? sport) {
-    if (performanceLevel == null || performanceLevel.isEmpty || sport == null) {
-      return false;
-    }
-    return sport.levels.any((level) => level.name == performanceLevel);
+  // نمایش دیالوگ انتخاب چند سطح عملکرد
+  Future<void> _showPerformanceLevelDialog(
+    BuildContext context,
+    WidgetRef ref,
+    ReportCard reportCard,
+    Sport? selectedSport,
+  ) async {
+    if (selectedSport == null) return;
+
+    final selectedLevels = List<String>.from(
+      reportCard.attendanceInfo.performanceLevels,
+    );
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('انتخاب سطوح عملکرد'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: selectedSport.levels.map((level) {
+                final isSelected = selectedLevels.contains(level.name);
+                return CheckboxListTile(
+                  title: Text(level.name),
+                  value: isSelected,
+                  onChanged: (bool? value) {
+                    setState(() {
+                      if (value == true) {
+                        selectedLevels.add(level.name);
+                      } else {
+                        selectedLevels.remove(level.name);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('لغو'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                ref
+                    .read(reportCardProvider.notifier)
+                    .updateAttendanceInfo(performanceLevels: selectedLevels);
+                Navigator.pop(context);
+              },
+              child: const Text('تایید'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildProgressInfo(BuildContext context, ReportCardState state) {

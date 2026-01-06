@@ -73,8 +73,7 @@ class ReportCardService {
     if (reportCard.attendanceInfo.attendedSessions != null) {
       filledFields++;
     }
-    if (reportCard.attendanceInfo.performanceLevel?.trim().isNotEmpty ??
-        false) {
+    if (reportCard.attendanceInfo.performanceLevels.isNotEmpty) {
       filledFields++;
     }
     if (reportCard.attendanceInfo.sportField?.trim().isNotEmpty ?? false) {
