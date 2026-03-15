@@ -286,18 +286,22 @@ class _FolderStudentsScreenState extends ConsumerState<FolderStudentsScreen> {
       _selectedStudentIndex = index;
     });
 
-    ref
-        .read(reportCardProvider.notifier)
-        .loadReportCard(
-          studentId,
-          studentName,
-          sportId: widget.selectedSportId,
-        );
-
+    // اول صفحه رو ببند و به صفحه کارنامه برو
     if (widget.onStudentSelected != null) {
       widget.onStudentSelected!();
     }
     Navigator.of(context).pop();
+
+    // بعد کارنامه رو بارگذاری کن
+    Future.microtask(() {
+      ref
+          .read(reportCardProvider.notifier)
+          .loadReportCard(
+            studentId,
+            studentName,
+            sportId: widget.selectedSportId,
+          );
+    });
   }
 
   Future<void> _handleFileSelected(String filePath, Folder folder) async {

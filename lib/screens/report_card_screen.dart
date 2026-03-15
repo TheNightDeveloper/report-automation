@@ -159,7 +159,7 @@ class ReportCardScreen extends ConsumerWidget {
     final selectedSport = reportCardState.selectedSport;
 
     return Card(
-      key: ValueKey(reportCard.studentInfo.name),
+      key: ValueKey(reportCard.studentId),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -207,7 +207,7 @@ class ReportCardScreen extends ConsumerWidget {
 
             // نام دانش‌آموز (read-only)
             TextFormField(
-              key: ValueKey('name_${reportCard.studentInfo.name}'),
+              key: ValueKey('name_${reportCard.studentId}'),
               initialValue: reportCard.studentInfo.name,
               decoration: const InputDecoration(
                 labelText: 'نام دانش‌آموز',
@@ -219,7 +219,7 @@ class ReportCardScreen extends ConsumerWidget {
 
             // مقطع
             DropdownButtonFormField<String>(
-              key: ValueKey('grade_${reportCard.studentInfo.name}'),
+              key: ValueKey('grade_${reportCard.studentId}'),
               initialValue: reportCard.studentInfo.grade?.isNotEmpty == true
                   ? reportCard.studentInfo.grade
                   : null,
@@ -244,7 +244,7 @@ class ReportCardScreen extends ConsumerWidget {
 
             // پایه
             DropdownButtonFormField<String>(
-              key: ValueKey('level_${reportCard.studentInfo.name}'),
+              key: ValueKey('level_${reportCard.studentId}'),
               initialValue: reportCard.studentInfo.level?.isNotEmpty == true
                   ? reportCard.studentInfo.level
                   : null,
@@ -269,7 +269,7 @@ class ReportCardScreen extends ConsumerWidget {
 
             // آموزشگاه
             DropdownButtonFormField<String>(
-              key: ValueKey('school_${reportCard.studentInfo.name}'),
+              key: ValueKey('school_${reportCard.studentId}'),
               initialValue: reportCard.studentInfo.school?.isNotEmpty == true
                   ? reportCard.studentInfo.school
                   : null,
@@ -294,7 +294,7 @@ class ReportCardScreen extends ConsumerWidget {
 
             // سرمربی
             DropdownButtonFormField<String>(
-              key: ValueKey('headCoach_${reportCard.studentInfo.name}'),
+              key: ValueKey('headCoach_${reportCard.studentId}'),
               initialValue: reportCard.studentInfo.headCoach?.isNotEmpty == true
                   ? reportCard.studentInfo.headCoach
                   : null,
@@ -332,7 +332,7 @@ class ReportCardScreen extends ConsumerWidget {
     final selectedSport = reportCardState.selectedSport;
 
     return Card(
-      key: ValueKey('attendance_${reportCard.studentInfo.name}'),
+      key: ValueKey('attendance_${reportCard.studentId}'),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -349,9 +349,7 @@ class ReportCardScreen extends ConsumerWidget {
                 // تعداد جلسات
                 Expanded(
                   child: TextFormField(
-                    key: ValueKey(
-                      'totalSessions_${reportCard.studentInfo.name}',
-                    ),
+                    key: ValueKey('totalSessions_${reportCard.studentId}'),
                     initialValue: reportCard.attendanceInfo.totalSessions
                         .toString(),
                     decoration: const InputDecoration(
@@ -374,9 +372,7 @@ class ReportCardScreen extends ConsumerWidget {
                 // جلسات حاضر
                 Expanded(
                   child: TextFormField(
-                    key: ValueKey(
-                      'attendedSessions_${reportCard.studentInfo.name}',
-                    ),
+                    key: ValueKey('attendedSessions_${reportCard.studentId}'),
                     initialValue: reportCard.attendanceInfo.attendedSessions
                         .toString(),
                     decoration: const InputDecoration(
@@ -904,7 +900,7 @@ class ReportCardScreen extends ConsumerWidget {
             Text('توضیحات', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             TextFormField(
-              key: ValueKey('comments_${reportCard.studentInfo.name}'),
+              key: ValueKey('comments_${reportCard.studentId}'),
               initialValue: reportCard.comments ?? '',
               decoration: const InputDecoration(
                 labelText: 'توضیحات و یادداشت‌ها',

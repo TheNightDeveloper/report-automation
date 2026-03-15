@@ -334,10 +334,20 @@ class ExportNotifier extends Notifier<ExportState> {
           : folders.where((f) => f.id == folderId).toList();
 
       // جمع‌آوری دانش‌آموزان از پوشه‌های انتخاب شده
-      final allStudents = <Student>[];
+      // استفاده از Set برای جلوگیری از تکراری شدن دانش‌آموزان
+      final studentIdsSet = <String>{};
+      final studentsMap = <String, Student>{};
+
       for (final folder in selectedFolders) {
-        allStudents.addAll(folder.students);
+        for (final student in folder.students) {
+          if (!studentIdsSet.contains(student.id)) {
+            studentIdsSet.add(student.id);
+            studentsMap[student.id] = student;
+          }
+        }
       }
+
+      final allStudents = studentsMap.values.toList();
 
       if (allStudents.isEmpty) {
         state = state.copyWith(
@@ -466,10 +476,20 @@ class ExportNotifier extends Notifier<ExportState> {
       final folderRepository = FolderRepository();
       final folders = await folderRepository.loadFolders();
 
-      final allStudents = <Student>[];
+      // استفاده از Set برای جلوگیری از تکراری شدن دانش‌آموزان
+      final studentIdsSet = <String>{};
+      final studentsMap = <String, Student>{};
+
       for (final folder in folders) {
-        allStudents.addAll(folder.students);
+        for (final student in folder.students) {
+          if (!studentIdsSet.contains(student.id)) {
+            studentIdsSet.add(student.id);
+            studentsMap[student.id] = student;
+          }
+        }
       }
+
+      final allStudents = studentsMap.values.toList();
 
       if (allStudents.isEmpty) {
         state = state.copyWith(

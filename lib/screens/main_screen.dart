@@ -51,7 +51,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       onStudentSelected: () => _onItemTapped(2),
       selectedSportId: _selectedSport?.id,
     ),
-    ReportCardScreen(key: ValueKey(_selectedSport?.id)),
+    const ReportCardScreen(),
     const ExportScreen(),
     const SportsListScreen(),
     const SettingsScreen(),
@@ -206,7 +206,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'نسخه 2.0.0',
+              'نسخه 3.0.0',
               style: Theme.of(context).textTheme.bodySmall,
               textAlign: TextAlign.center,
             ),
