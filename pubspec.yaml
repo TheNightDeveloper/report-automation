@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 3.0.0+1
+version: 4.0.0+1
 
 environment:
   sdk: ">= 3.11.0" 
@@ -43,6 +43,9 @@ dependencies:
   
   # Path Provider
   path_provider: 
+  
+  # UUID Generator
+  uuid: ^4.5.1
   
   # Desktop Drop
   desktop_drop: 

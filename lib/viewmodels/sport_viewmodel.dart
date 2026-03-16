@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../repositories/sport_repository.dart';
+import '../utils/id_generator.dart';
 
 // State class برای مدیریت رشته‌های ورزشی
 class SportState {
@@ -89,7 +90,7 @@ class SportNotifier extends Notifier<SportState> {
     try {
       // ایجاد Sport جدید
       final sport = Sport(
-        id: 'sport_${DateTime.now().millisecondsSinceEpoch}',
+        id: IdGenerator.generateSportId(),
         name: name.trim(),
         description: description?.trim(),
         levels: levels ?? [],
@@ -249,9 +250,8 @@ class SportNotifier extends Notifier<SportState> {
 
   /// ایجاد رشته جدید خالی برای فرم
   void createNewSport() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
     final newSport = Sport(
-      id: 'sport_$timestamp',
+      id: IdGenerator.generateSportId(),
       name: '',
       description: null,
       levels: [],

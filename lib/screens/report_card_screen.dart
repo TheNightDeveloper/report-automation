@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../viewmodels/report_card_viewmodel.dart';
 import '../viewmodels/app_data_viewmodel.dart';
+import '../viewmodels/navigation_viewmodel.dart';
 import '../models/models.dart';
 import '../widgets/drop_zone.dart';
 
@@ -12,17 +13,42 @@ class _SaveIntent extends Intent {
   const _SaveIntent();
 }
 
-class ReportCardScreen extends ConsumerWidget {
+class _NextStudentIntent extends Intent {
+  const _NextStudentIntent();
+}
+
+class _PreviousStudentIntent extends Intent {
+  const _PreviousStudentIntent();
+}
+
+class ReportCardScreen extends ConsumerStatefulWidget {
   const ReportCardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReportCardScreen> createState() => _ReportCardScreenState();
+}
+
+class _ReportCardScreenState extends ConsumerState<ReportCardScreen> {
+  @override
+  void dispose() {
+    // پاک کردن navigation state وقتی از صفحه خارج میشیم
+    // فقط اگر به صفحه دیگری رفتیم (نه وقتی به دانش‌آموز دیگه میریم)
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final reportCardState = ref.watch(reportCardProvider);
+    final navigationState = ref.watch(navigationProvider);
 
     return Shortcuts(
       shortcuts: <ShortcutActivator, Intent>{
         const SingleActivator(LogicalKeyboardKey.keyS, control: true):
             const _SaveIntent(),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft, alt: true):
+            const _NextStudentIntent(),
+        const SingleActivator(LogicalKeyboardKey.arrowRight, alt: true):
+            const _PreviousStudentIntent(),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
@@ -32,13 +58,34 @@ class ReportCardScreen extends ConsumerWidget {
               return null;
             },
           ),
+          _NextStudentIntent: CallbackAction<_NextStudentIntent>(
+            onInvoke: (_) {
+              if (navigationState.hasNext) {
+                _navigateToNext(ref, navigationState);
+              }
+              return null;
+            },
+          ),
+          _PreviousStudentIntent: CallbackAction<_PreviousStudentIntent>(
+            onInvoke: (_) {
+              if (navigationState.hasPrevious) {
+                _navigateToPrevious(ref, navigationState);
+              }
+              return null;
+            },
+          ),
         },
         child: Focus(
           autofocus: true,
           child: Scaffold(
             appBar: AppBar(
-              title: const Text('کارنامه'),
+              title: Text(
+                reportCardState.currentReportCard != null
+                    ? 'کارنامه - ${reportCardState.currentReportCard!.studentInfo.name}'
+                    : 'کارنامه',
+              ),
               actions: [
+                // دکمه ذخیره
                 if (reportCardState.currentReportCard != null)
                   IconButton(
                     icon: const Icon(Icons.save),
@@ -54,6 +101,38 @@ class ReportCardScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _navigateToNext(WidgetRef ref, NavigationState navigationState) {
+    if (!navigationState.hasNext) return;
+
+    final nextStudent = navigationState.nextStudent!;
+    ref.read(navigationProvider.notifier).goToNext();
+
+    // بارگذاری کارنامه دانش‌آموز بعدی
+    ref
+        .read(reportCardProvider.notifier)
+        .loadReportCard(
+          nextStudent.id,
+          nextStudent.name,
+          sportId: ref.read(reportCardProvider).selectedSport?.id,
+        );
+  }
+
+  void _navigateToPrevious(WidgetRef ref, NavigationState navigationState) {
+    if (!navigationState.hasPrevious) return;
+
+    final previousStudent = navigationState.previousStudent!;
+    ref.read(navigationProvider.notifier).goToPrevious();
+
+    // بارگذاری کارنامه دانش‌آموز قبلی
+    ref
+        .read(reportCardProvider.notifier)
+        .loadReportCard(
+          previousStudent.id,
+          previousStudent.name,
+          sportId: ref.read(reportCardProvider).selectedSport?.id,
+        );
   }
 
   Widget _buildBody(
@@ -105,6 +184,10 @@ class ReportCardScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Navigation Info
+          _buildNavigationInfo(context, ref),
+          const SizedBox(height: 16),
+
           // Header Section
           _buildHeaderSection(context, ref, reportCardState.currentReportCard!),
           const SizedBox(height: 24),
@@ -145,6 +228,57 @@ class ReportCardScreen extends ConsumerWidget {
           // Progress Info
           _buildProgressInfo(context, reportCardState),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNavigationInfo(BuildContext context, WidgetRef ref) {
+    final navigationState = ref.watch(navigationProvider);
+
+    if (navigationState.students.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final currentIndex = navigationState.currentIndex + 1;
+    final totalStudents = navigationState.students.length;
+
+    return Card(
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Icon(
+              Icons.people,
+              size: 20,
+              color: Theme.of(context).colorScheme.onSecondaryContainer,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'دانش‌آموز $currentIndex از $totalStudents',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            if (navigationState.hasPrevious)
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: navigationState.previousStudent?.name,
+                onPressed: () => _navigateToPrevious(ref, navigationState),
+                color: Theme.of(context).colorScheme.onSecondaryContainer,
+              ),
+            if (navigationState.hasNext)
+              IconButton(
+                icon: const Icon(Icons.arrow_forward),
+                tooltip: navigationState.nextStudent?.name,
+                onPressed: () => _navigateToNext(ref, navigationState),
+                color: Theme.of(context).colorScheme.onSecondaryContainer,
+              ),
+          ],
+        ),
       ),
     );
   }

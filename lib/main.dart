@@ -9,6 +9,7 @@ import 'services/migration_service.dart';
 import 'repositories/sport_repository.dart';
 import 'repositories/report_card_repository.dart';
 import 'screens/main_screen.dart';
+import 'screens/migration_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +24,8 @@ void main() async {
 
   await HiveService.initialize();
 
-  // اجرای migration در صورت نیاز
+  // بررسی نیاز به migration
+  bool needsAnyMigration = false;
   try {
     final sportRepository = SportRepository();
     final reportCardRepository = ReportCardRepository();
@@ -33,23 +35,20 @@ void main() async {
     );
 
     final needsMigration = await migrationService.needsMigration();
-    if (needsMigration) {
-      print('شروع migration...');
-      await migrationService.migrateToV2();
-      print('Migration با موفقیت کامل شد');
-    } else {
-      print('نیازی به migration نیست');
-    }
+    final needsIdMigration = await migrationService.needsIdMigration();
+
+    needsAnyMigration = needsMigration || needsIdMigration;
   } catch (e) {
-    print('خطا در migration: $e');
-    // ادامه اجرای برنامه حتی در صورت خطا
+    print('خطا در بررسی migration: $e');
   }
 
-  runApp(const ProviderScope(child: MyApp()));
+  runApp(ProviderScope(child: MyApp(needsMigration: needsAnyMigration)));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool needsMigration;
+
+  const MyApp({super.key, this.needsMigration = false});
 
   @override
   Widget build(BuildContext context) {
@@ -59,8 +58,9 @@ class MyApp extends StatelessWidget {
 
       // تنظیم Theme
       theme: AppTheme.lightTheme,
+      themeMode: ThemeMode.light,
 
-      // تنظیم RTL
+      // تنظیم زبان فارسی
       locale: const Locale('fa', 'IR'),
       supportedLocales: const [Locale('fa', 'IR')],
       localizationsDelegates: const [
@@ -69,23 +69,25 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
 
-      // تنظیم جهت متن و Responsive
-      builder: (context, child) {
-        return ResponsiveBreakpoints.builder(
-          child: Directionality(
-            textDirection: TextDirection.rtl,
-            child: child!,
-          ),
-          breakpoints: [
-            const Breakpoint(start: 0, end: 450, name: MOBILE),
-            const Breakpoint(start: 451, end: 800, name: TABLET),
-            const Breakpoint(start: 801, end: 1920, name: DESKTOP),
-            const Breakpoint(start: 1921, end: double.infinity, name: '4K'),
-          ],
-        );
-      },
+      // Responsive Framework
+      builder: (context, child) => ResponsiveBreakpoints.builder(
+        child: child!,
+        breakpoints: [
+          const Breakpoint(start: 0, end: 450, name: MOBILE),
+          const Breakpoint(start: 451, end: 800, name: TABLET),
+          const Breakpoint(start: 801, end: 1920, name: DESKTOP),
+          const Breakpoint(start: 1921, end: double.infinity, name: '4K'),
+        ],
+      ),
 
-      home: const MainScreen(),
+      // صفحه اصلی
+      initialRoute: needsMigration ? '/migration' : '/',
+
+      // Routes
+      routes: {
+        '/': (context) => const MainScreen(),
+        '/migration': (context) => const MigrationScreen(),
+      },
     );
   }
 }

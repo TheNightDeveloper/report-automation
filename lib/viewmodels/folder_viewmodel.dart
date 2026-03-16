@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../repositories/folder_repository.dart';
+import '../repositories/report_card_repository.dart';
+import '../utils/id_generator.dart';
 
 // State class برای مدیریت پوشه‌ها
 class FolderState {
@@ -89,7 +91,7 @@ class FolderNotifier extends Notifier<FolderState> {
     }
 
     try {
-      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      final id = IdGenerator.generateFolderId();
       final newFolder = Folder(
         id: id,
         name: name.trim(),
@@ -268,6 +270,17 @@ class FolderNotifier extends Notifier<FolderState> {
       }).toList();
 
       state = state.copyWith(folders: updatedFolders);
+
+      // حذف کارنامه دانش‌آموز اگر در هیچ پوشه دیگری نیست
+      final studentExistsInOtherFolders = updatedFolders.any(
+        (f) => f.id != folderId && f.students.any((s) => s.id == studentId),
+      );
+
+      if (!studentExistsInOtherFolders) {
+        // دانش‌آموز در هیچ پوشه دیگری نیست، کارنامه‌اش رو پاک کن
+        final reportCardRepository = ReportCardRepository();
+        await reportCardRepository.deleteReportCard(studentId);
+      }
     } catch (e) {
       state = state.copyWith(
         errorMessage: 'خطا در حذف دانش‌آموز: ${e.toString()}',

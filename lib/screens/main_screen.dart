@@ -206,7 +206,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'نسخه 3.0.0',
+              'نسخه 4.0.0',
               style: Theme.of(context).textTheme.bodySmall,
               textAlign: TextAlign.center,
             ),
