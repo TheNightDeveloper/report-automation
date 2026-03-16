@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../viewmodels/folder_viewmodel.dart';
 import '../viewmodels/report_card_viewmodel.dart';
+import '../viewmodels/navigation_viewmodel.dart';
 import '../models/models.dart';
 import '../services/excel_import_service.dart';
 import '../widgets/drop_zone.dart';
+import '../utils/id_generator.dart';
 
 class FolderStudentsScreen extends ConsumerStatefulWidget {
   final String folderId;
@@ -26,6 +28,15 @@ class FolderStudentsScreen extends ConsumerStatefulWidget {
 
 class _FolderStudentsScreenState extends ConsumerState<FolderStudentsScreen> {
   int? _selectedStudentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    // پاک کردن navigation state وقتی وارد پوشه جدید میشیم
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(navigationProvider.notifier).clear();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -286,6 +297,20 @@ class _FolderStudentsScreenState extends ConsumerState<FolderStudentsScreen> {
       _selectedStudentIndex = index;
     });
 
+    // تنظیم navigation state
+    final folderState = ref.read(folderProvider);
+    final folder = folderState.folders.firstWhere(
+      (f) => f.id == widget.folderId,
+    );
+
+    ref
+        .read(navigationProvider.notifier)
+        .setStudents(
+          folderId: widget.folderId,
+          students: folder.students,
+          currentStudentId: studentId,
+        );
+
     // اول صفحه رو ببند و به صفحه کارنامه برو
     if (widget.onStudentSelected != null) {
       widget.onStudentSelected!();
@@ -389,7 +414,7 @@ class _FolderStudentsScreenState extends ConsumerState<FolderStudentsScreen> {
     );
 
     if (result != null && result.isNotEmpty) {
-      final id = DateTime.now().millisecondsSinceEpoch.toString();
+      final id = IdGenerator.generateStudentId();
       final newStudent = Student(id: id, name: result);
 
       await ref

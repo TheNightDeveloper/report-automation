@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:excel/excel.dart';
 import '../models/models.dart';
+import '../utils/id_generator.dart';
 
 class ExcelImportService {
   /// وارد کردن لیست دانش‌آموزان از فایل (Excel یا CSV)
@@ -26,10 +27,9 @@ class ExcelImportService {
       }
 
       final students = <Student>[];
-      final seenIds = <String>{};
       final seenNames = <String>{};
 
-      // شروع از ردیف اول (بدون header)
+      // شروع از ردیف اول (ستون اول = نام دانش‌آموز)
       for (int i = 0; i < lines.length; i++) {
         final line = lines[i].trim();
         if (line.isEmpty) continue;
@@ -37,28 +37,23 @@ class ExcelImportService {
         // تقسیم بر اساس کاما یا سمی‌کالن
         final parts = line.split(RegExp(r'[,;]'));
 
-        // باید حداقل 2 ستون داشته باشد: ID و Name
-        if (parts.length < 2) continue;
+        // باید حداقل 1 ستون داشته باشد: Name
+        if (parts.isEmpty) continue;
 
-        final id = parts[0].trim().replaceAll('"', '');
-        final name = parts[1].trim().replaceAll('"', '');
+        final name = parts[0].trim().replaceAll('"', '');
 
         // بررسی خالی نبودن
-        if (id.isEmpty || name.isEmpty) continue;
-
-        // بررسی تکراری بودن ID
-        if (seenIds.contains(id)) {
-          throw Exception('شناسه تکراری یافت شد: $id');
-        }
+        if (name.isEmpty) continue;
 
         // بررسی تکراری بودن نام
         if (seenNames.contains(name)) {
           throw Exception('نام تکراری یافت شد: $name');
         }
 
-        seenIds.add(id);
         seenNames.add(name);
 
+        // ساخت ID یکتا با UUID
+        final id = IdGenerator.generateStudentId();
         students.add(Student(id: id, name: name, isCompleted: false));
       }
 
@@ -94,39 +89,28 @@ class ExcelImportService {
 
       // استخراج نام‌های دانش‌آموزان
       final students = <Student>[];
-      final seenIds = <String>{};
       final seenNames = <String>{};
 
-      // شروع از ردیف اول (بدون header)
+      // شروع از ردیف اول (ستون اول = نام دانش‌آموز)
       for (int i = 0; i < sheet.rows.length; i++) {
         final row = sheet.rows[i];
 
-        // باید حداقل 2 ستون داشته باشد: ID و Name
-        if (row.isEmpty || row.length < 2) {
+        // باید حداقل 1 ستون داشته باشد: Name
+        if (row.isEmpty) {
           continue;
         }
 
-        final idCell = row[0];
-        final nameCell = row[1];
+        final nameCell = row[0];
 
-        if (idCell == null ||
-            idCell.value == null ||
-            nameCell == null ||
-            nameCell.value == null) {
+        if (nameCell == null || nameCell.value == null) {
           continue;
         }
 
-        final id = idCell.value.toString().trim();
         final name = nameCell.value.toString().trim();
 
         // بررسی خالی نبودن
-        if (id.isEmpty || name.isEmpty) {
+        if (name.isEmpty) {
           continue;
-        }
-
-        // بررسی تکراری بودن ID
-        if (seenIds.contains(id)) {
-          throw Exception('شناسه تکراری یافت شد: $id');
         }
 
         // بررسی تکراری بودن نام
@@ -134,9 +118,10 @@ class ExcelImportService {
           throw Exception('نام تکراری یافت شد: $name');
         }
 
-        seenIds.add(id);
         seenNames.add(name);
 
+        // ساخت ID یکتا با UUID
+        final id = IdGenerator.generateStudentId();
         students.add(Student(id: id, name: name, isCompleted: false));
       }
 

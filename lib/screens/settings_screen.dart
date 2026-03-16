@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../viewmodels/app_data_viewmodel.dart';
+import '../services/migration_service.dart';
+import '../repositories/sport_repository.dart';
+import '../repositories/report_card_repository.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -103,6 +106,65 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     onDelete: (item) => ref
                         .read(appDataProvider.notifier)
                         .removeHeadCoach(item),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // بخش مدیریت داده‌ها
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.data_usage,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'مدیریت داده‌ها',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'اگر مشکلی در شناسه‌های دانش‌آموزان دارید، می‌توانید migration را مجدداً اجرا کنید.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _fixDuplicateIds(),
+                                  icon: const Icon(Icons.healing),
+                                  label: const Text('اصلاح ID های تکراری'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _resetAndRunMigration(),
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('Migration شناسه‌ها'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -310,6 +372,177 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SnackBar(
             content: Text('تنظیمات به حالت پیش‌فرض بازگشت'),
             backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _resetAndRunMigration() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('اجرای مجدد Migration'),
+        content: const Text(
+          'این عملیات شناسه‌های جدید UUID برای تمام دانش‌آموزان ایجاد می‌کند.\n\n'
+          'آیا مطمئن هستید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('اجرا'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      if (!mounted) return;
+
+      // نمایش loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('در حال اجرای migration...'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      try {
+        final sportRepository = SportRepository();
+        final reportCardRepository = ReportCardRepository();
+        final migrationService = MigrationService(
+          sportRepository,
+          reportCardRepository,
+        );
+
+        // Reset migration flag
+        await migrationService.resetIdMigration();
+
+        // اجرای migration
+        await migrationService.migrateStudentIds();
+
+        if (!mounted) return;
+        Navigator.pop(context); // بستن loading
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Migration با موفقیت انجام شد'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        Navigator.pop(context); // بستن loading
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در migration: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _fixDuplicateIds() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('اصلاح ID های تکراری'),
+        content: const Text(
+          'این عملیات ID های تکراری را پیدا کرده و برای دانش‌آموزان با ID یکسان، شناسه‌های جدید ایجاد می‌کند.\n\n'
+          'آیا مطمئن هستید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('اصلاح'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      if (!mounted) return;
+
+      // نمایش loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: Card(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('در حال اصلاح ID های تکراری...'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      try {
+        final sportRepository = SportRepository();
+        final reportCardRepository = ReportCardRepository();
+        final migrationService = MigrationService(
+          sportRepository,
+          reportCardRepository,
+        );
+
+        // اصلاح ID های تکراری
+        await migrationService.fixDuplicateIds();
+
+        if (!mounted) return;
+        Navigator.pop(context); // بستن loading
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('اصلاح ID های تکراری با موفقیت انجام شد'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        Navigator.pop(context); // بستن loading
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در اصلاح: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
