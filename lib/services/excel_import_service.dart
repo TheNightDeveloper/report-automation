@@ -100,7 +100,7 @@ class ExcelImportService {
           continue;
         }
 
-        final nameCell = row[0];
+        final nameCell = row[1];
 
         if (nameCell == null || nameCell.value == null) {
           continue;
